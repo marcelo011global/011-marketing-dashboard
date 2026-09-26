@@ -71,12 +71,11 @@ git commit -m "description of change"
 git push origin main
 ```
 
-## Setup (one time)
-1. Create GitHub repo `marcelo011global/011-marketing-dashboard`, push, enable Pages (main branch, root).
-2. DNS: `CNAME` record `marketing` → `marcelo011global.github.io` on the 011telecom.com DNS host (same place as the `deals` record).
-3. Firebase console → Authentication → Settings → Authorized domains: add `marketing.011telecom.com`.
-4. Firestore rules: allow signed-in company users to read `mkt_*`, and write
-   `mkt_proposals` (decision fields only), `mkt_activity`, `mkt_sampleDecisions`, `mkt_sampleActivity`.
+## Setup (done 2026-09-26)
+Repo `marcelo011global/011-marketing-dashboard` on GitHub Pages (HTTPS enforced),
+GoDaddy CNAME `marketing` → `marcelo011global.github.io`, domain added to Firebase
+Auth authorized domains, and existing Firestore rules already allow the `mkt_*`
+writes (Approve verified on the live site).
 
 ## Company Info
 - **Company**: 011 Global · **Contact**: Marcelo Licht (marcelo@011global.com)
