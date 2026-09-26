@@ -19,7 +19,7 @@ Sibling of [011-deals-dashboard](https://github.com/marcelo011global/011-deals-d
 file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global: `logo.png` (trimmed from the official logo), `favicon.png` (the orange "011" speech bubble), brand orange `#EE7805` sampled from the logo.
 
 ## Live URL
-- Production: https://marketing.011global.com (GitHub Pages — see Setup below)
+- Production: https://marketing.011telecom.com (GitHub Pages — see Setup below)
 - Local: serve the folder and open `http://localhost:<port>/?preview` — skips
   sign-in and runs fully on sample data without touching Firestore (localhost only).
 
@@ -66,8 +66,8 @@ git push origin main
 
 ## Setup (one time)
 1. Create GitHub repo `marcelo011global/011-marketing-dashboard`, push, enable Pages (main branch, root).
-2. DNS: `CNAME` record `marketing` → `marcelo011global.github.io` on the 011global.com DNS host.
-3. Firebase console → Authentication → Settings → Authorized domains: add `marketing.011global.com`.
+2. DNS: `CNAME` record `marketing` → `marcelo011global.github.io` on the 011telecom.com DNS host (same place as the `deals` record).
+3. Firebase console → Authentication → Settings → Authorized domains: add `marketing.011telecom.com`.
 4. Firestore rules: allow signed-in company users to read `mkt_*`, and write
    `mkt_proposals` (decision fields only), `mkt_activity`, `mkt_sampleDecisions`, `mkt_sampleActivity`.
 
