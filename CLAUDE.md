@@ -33,9 +33,12 @@ file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global: `logo.png` (trimm
 - **Auth**: Email/Password + Google Sign-In, restricted to `@011global.com` / `@011telecom.com`.
   No sign-up form here — accounts are created on deals.011telecom.com.
 - **Hosting**: GitHub Pages, custom domain in `CNAME`.
-- **Backend (planned, separate repo)**: Python on Cloud Run — Google Ads API sync,
-  daily rule checks, weekly Claude review, image/video generation. Writes into
-  the collections below; this site only reads them and records decisions.
+- **Google Ads sync**: `sync/AdsSync.gs`, a Google Apps Script (same pattern as
+  `DriveSync.gs`) that calls the Google Ads API with the owner's login and writes
+  `mkt_markets`, `mkt_campaigns`, `mkt_dailyStats` daily. Setup in `sync/README.md`.
+- **Later**: daily rule checks, weekly Claude review and image/video generation
+  write `mkt_proposals` / `mkt_reviews` / `mkt_activity`; this site only reads them
+  and records decisions.
 
 ## Currency
 Each market's pages show its account currency. Anything mixing markets (overview
