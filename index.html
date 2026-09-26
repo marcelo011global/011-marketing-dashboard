@@ -110,7 +110,7 @@ tr.sel:hover td{background:var(--orange-light);}
 td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor:pointer;}
 .bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
 .bar i{display:block;height:8px;border-radius:0 4px 4px 0;background:var(--orange);min-width:2px;}
-.bar .track{width:90px;display:flex;justify-content:flex-start;}
+.bar .btrack{width:90px;display:flex;justify-content:flex-start;}
 .status{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;}
 .status.enabled{background:var(--green-light);color:var(--green);}
 .status.paused{background:#EEE;color:var(--mid);}
@@ -184,6 +184,13 @@ td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor
 .mini-prop:hover{border-color:var(--orange);}
 .mini-prop .go{margin-left:auto;color:var(--orange);font-weight:600;font-size:12.5px;white-space:nowrap;}
 
+.alert{background:var(--red-light);color:var(--red);border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-bottom:12px;line-height:1.5;}
+.track{font-size:12px;font-weight:600;margin-top:5px;}
+.track b{display:inline-block;width:16px;height:16px;border-radius:50%;text-align:center;line-height:16px;font-size:10px;color:#fff;margin-right:3px;}
+.track.ok{color:var(--green);} .track.ok b{background:var(--green);}
+.track.bad{color:var(--red);} .track.bad b{background:var(--red);}
+.track.warn{color:var(--amber);} .track.warn b{background:var(--amber);}
+.track .tnote{font-weight:400;color:var(--mid);margin-top:4px;line-height:1.5;}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none;z-index:200;max-width:90vw;}
 #toast.error{background:var(--red);}
 
@@ -420,20 +427,32 @@ function datesIn({ start, end }){
   while (iso(d) <= end) { out.push(iso(d)); d = addDays(d, 1); }
   return out;
 }
-const blank = () => ({ impressions:0, clicks:0, cost:0, conversions:0, signups:0, purchases:0, value:0 });
-function addRow(a, r){ for (const k in a) a[k] += +r[k] || 0; return a; }
-function aggFor(campaignIds, p){
+const blank = () => ({ impressions:0, clicks:0, cost:0, conversions:0, leads:0, purchases:0, value:0 });
+function addRow(a, r, f = 1){ for (const k in a) a[k] += (+r[k] || 0) * (k === 'cost' || k === 'value' ? f : 1); return a; }
+// Each market reports in its Google Ads account currency. A set of campaigns
+// from one market stays in that currency; a mix is converted to USD.
+const currencyOfCampaign = id => marketById(campaignById(id)?.marketId)?.currency || 'USD';
+function curOf(campaignIds){
+  const set = new Set(campaignIds.map(currencyOfCampaign));
+  return set.size === 1 ? [...set][0] : 'USD';
+}
+const usdRate = c => c === 'USD' ? 1 : (S.markets.find(m => m.currency === c)?.usdRate || 1);
+const factor = (id, cur) => usdRate(currencyOfCampaign(id)) / usdRate(cur);
+function aggFor(campaignIds, p, cur = curOf(campaignIds)){
   const a = blank();
   for (const id of campaignIds) {
     const m = S.stats.get(id); if (!m) continue;
-    for (const [date, r] of m) if (date >= p.start && date <= p.end) addRow(a, r);
+    const f = factor(id, cur);
+    for (const [date, r] of m) if (date >= p.start && date <= p.end) addRow(a, r, f);
   }
+  a.cur = cur;
   return a;
 }
-function daily(campaignIds, p){
+function daily(campaignIds, p, cur = curOf(campaignIds)){
+  const fs = campaignIds.map(id => factor(id, cur));
   return datesIn(p).map(date => {
     const a = blank();
-    for (const id of campaignIds) { const r = S.stats.get(id)?.get(date); if (r) addRow(a, r); }
+    campaignIds.forEach((id, i) => { const r = S.stats.get(id)?.get(date); if (r) addRow(a, r, fs[i]); });
     return { date, ...a };
   });
 }
@@ -443,9 +462,11 @@ const M = {
   roas: a => a.cost ? a.value / a.cost : NaN,
   ctr: a => a.impressions ? a.clicks / a.impressions : NaN,
 };
+const nf = {};
+const moneyFmt = (cur, d) => nf[cur + d] ||= new Intl.NumberFormat('en-US', { style:'currency', currency:cur, minimumFractionDigits:d, maximumFractionDigits:d });
 const fmt = {
-  money: v => isFinite(v) ? '$' + Math.round(v).toLocaleString('en-US') : '—',
-  money2: v => isFinite(v) ? '$' + v.toFixed(2) : '—',
+  money: (v, cur = 'USD') => isFinite(v) ? moneyFmt(cur, 0).format(v) : '—',
+  money2: (v, cur = 'USD') => isFinite(v) ? moneyFmt(cur, 2).format(v) : '—',
   int: v => isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—',
   pct: v => isFinite(v) ? (v * 100).toFixed(2) + '%' : '—',
   x: v => isFinite(v) ? v.toFixed(2) + '×' : '—',
@@ -472,7 +493,7 @@ const idsOf = cs => cs.map(c => c.id);
 const marketById = id => S.markets.find(m => m.id === id);
 const campaignById = id => S.campaigns.find(c => c.id === id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const flags = m => `<span class="flags" title="${esc(m.origin)} → ${esc(m.host)}">${m.flags?.[0] || ''}<span class="arrow">→</span>${m.flags?.[1] || ''}</span>`;
+const flags = m => `<span class="flags" title="${esc(m.name)}">${(m.flags || []).join('<span class="arrow">→</span>')}</span>`;
 const dShort = s => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
 const dTime = d => d ? d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '';
 function ago(d){
@@ -534,7 +555,18 @@ function sparkline(values){
 // ─────────────────────── Views ───────────────────────
 function kpiRow(A, B, list = KPIS){
   return `<div class="kpis">${list.map(k => `<div class="card kpi"><div class="lbl">${k.label}</div>
-    <div class="val">${k.f(M[k.key](A))}</div>${delta(M[k.key](A), M[k.key](B), k.good)} <span class="delta vs">vs prior ${S.days}d</span></div>`).join('')}</div>`;
+    <div class="val">${k.f(M[k.key](A), A.cur)}</div>${delta(M[k.key](A), M[k.key](B), k.good)} <span class="delta vs">vs prior ${S.days}d</span></div>`).join('')}</div>`;
+}
+const TRACK = {
+  recording: ['ok', '✓', 'Purchases recording'],
+  not_recording: ['bad', '✕', 'Purchases not recording'],
+  check: ['warn', '!', 'Tracking needs checking'],
+};
+function trackLine(m, long){
+  const t = m.tracking; if (!t) return '';
+  const [cls, icon, label] = TRACK[t.status] || TRACK.check;
+  const since = t.lastConversion ? ` · last recorded ${dShort(t.lastConversion)}` : '';
+  return `<div class="track ${cls}"><b>${icon}</b> ${label}${since}${long && t.note ? `<div class="tnote">${esc(t.note)}</div>` : ''}</div>`;
 }
 const pendingFor = marketId => proposals().filter(p => p.status === 'pending' && (!marketId || p.marketId === marketId));
 
@@ -544,27 +576,28 @@ function viewPerformance(){
   const A = aggFor(all, cur), B = aggFor(all, prev);
   const rows = S.markets.map(m => {
     const ids = idsOf(campaignsOf(m.id));
-    return { m, ids, a: aggFor(ids, cur), b: aggFor(ids, prev) };
-  }).sort((x, y) => y.a.cost - x.a.cost);
-  const maxCost = Math.max(...rows.map(r => r.a.cost), 1);
+    return { m, ids, a: aggFor(ids, cur), b: aggFor(ids, prev), usd: aggFor(ids, cur, 'USD').cost };
+  }).sort((x, y) => y.usd - x.usd);
+  const maxCost = Math.max(...rows.map(r => r.usd), 1);
   if (!S.markets.length) return `<div class="empty">No markets yet.</div>`;
   return `
   <div class="page-head"><div><h1>Performance by market</h1>
-    <div class="sub">${dShort(cur.start)} – ${dShort(cur.end)} · all Google Ads campaigns, grouped by diaspora corridor</div></div></div>
+    <div class="sub">${dShort(cur.start)} – ${dShort(cur.end)} · all Google Ads accounts${A.cur === 'USD' && S.markets.some(m => m.currency && m.currency !== 'USD') ? ` · totals in USD (${S.markets.filter(m => m.currency && m.currency !== 'USD').map(m => `1 ${m.currency} = $${(+m.usdRate).toFixed(2)}`).join(', ')})` : ''}</div></div></div>
+  ${S.mode === 'sample' && S.markets.some(m => m.tracking && m.tracking.status !== 'recording') ? `<div class="alert"><b>Conversion tracking is broken.</b> Google Ads has recorded no purchases since Aug 14, so real conversion numbers are 0 until the site fix ships. Conversion figures here are sample data.</div>` : ''}
   ${kpiRow(A, B)}
   <h2 class="sec">Markets</h2>
   <div class="markets">${rows.map(({ m, ids, a, b }) => {
     const active = campaignsOf(m.id).filter(c => c.status === 'ENABLED').length;
     const pend = pendingFor(m.id).length;
-    const series = daily(ids, cur).map(d => d.conversions);
+    const series = daily(ids, cur).map(d => d.conversions), c = a.cur;
     return `<a class="mcard" href="#/market/${esc(m.id)}">
       <div class="mhead">${flags(m)}<div><div class="mname">${esc(m.name)}</div>
-        <div class="msub">${active} active campaign${active === 1 ? '' : 's'} · ${esc((m.cities || []).join(', '))}</div></div>
+        <div class="msub">${active} active campaign${active === 1 ? '' : 's'} · ${esc(m.subtitle || (m.cities || []).join(', '))}</div>${trackLine(m)}</div>
         ${pend ? `<span class="pending">${pend} to review</span>` : ''}</div>
       <div class="mstats">
-        <div class="mstat"><div class="l">Spend</div><div class="v">${fmt.money(a.cost)}</div>${delta(a.cost, b.cost, null)}</div>
+        <div class="mstat"><div class="l">Spend</div><div class="v">${fmt.money(a.cost, c)}</div>${delta(a.cost, b.cost, null)}</div>
         <div class="mstat"><div class="l">Conv.</div><div class="v">${fmt.int(a.conversions)}</div>${delta(a.conversions, b.conversions, 'up')}</div>
-        <div class="mstat"><div class="l">CPA</div><div class="v">${fmt.money2(M.cpa(a))}</div>${delta(M.cpa(a), M.cpa(b), 'down')}</div>
+        <div class="mstat"><div class="l">CPA</div><div class="v">${fmt.money2(M.cpa(a), c)}</div>${delta(M.cpa(a), M.cpa(b), 'down')}</div>
         <div class="mstat"><div class="l">ROAS</div><div class="v">${fmt.x(M.roas(a))}</div>${delta(M.roas(a), M.roas(b), 'up')}</div>
       </div>
       <div class="spark"><div class="l"><span>Daily conversions</span><span>${dShort(cur.start)} – ${dShort(cur.end)}</span></div>${sparkline(series)}</div>
@@ -573,11 +606,11 @@ function viewPerformance(){
   <h2 class="sec">Compare markets</h2>
   <div class="table-wrap"><table>
     <thead><tr><th>Market</th><th>Spend</th><th>Clicks</th><th>CTR</th><th>Conversions</th><th>Cost / conv.</th><th>Conv. value</th><th>ROAS</th><th>Conv. change</th></tr></thead>
-    <tbody>${rows.map(({ m, a, b }) => `<tr class="link" onclick="location.hash='#/market/${esc(m.id)}'">
+    <tbody>${rows.map(({ m, a, b, usd }) => `<tr class="link" onclick="location.hash='#/market/${esc(m.id)}'">
       <td>${flags(m)} &nbsp;${esc(m.name)}</td>
-      <td><div class="bar">${fmt.money(a.cost)}<span class="track"><i style="width:${(a.cost / maxCost * 100).toFixed(1)}%"></i></span></div></td>
+      <td><div class="bar">${fmt.money(a.cost, a.cur)}<span class="btrack"><i style="width:${(usd / maxCost * 100).toFixed(1)}%"></i></span></div></td>
       <td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td><td>${fmt.int(a.conversions)}</td>
-      <td>${fmt.money2(M.cpa(a))}</td><td>${fmt.money(a.value)}</td><td>${fmt.x(M.roas(a))}</td>
+      <td>${fmt.money2(M.cpa(a), a.cur)}</td><td>${fmt.money(a.value, a.cur)}</td><td>${fmt.x(M.roas(a))}</td>
       <td>${delta(a.conversions, b.conversions, 'up')}</td></tr>`).join('')}</tbody>
   </table></div>`;
 }
@@ -594,17 +627,18 @@ function viewMarket(id){
   return `
   <a class="crumb" href="#/performance">← All markets</a>
   <div class="page-head"><div style="display:flex;gap:12px;align-items:center">${flags(m).replace('class="flags"', 'class="flags" style="font-size:30px"')}
-    <div><h1>${esc(m.name)}</h1><div class="sub">${esc((m.cities || []).join(' · '))}${m.language ? ' · ads in ' + esc(m.language) : ''} · ${dShort(cur.start)} – ${dShort(cur.end)}</div></div></div></div>
+    <div><h1>${esc(m.name)}</h1><div class="sub">${esc(m.subtitle || (m.cities || []).join(' · '))}${m.language ? ' · ads in ' + esc(m.language) : ''}${m.currency ? ' · figures in ' + esc(m.currency) : ''} · ${dShort(cur.start)} – ${dShort(cur.end)}</div></div></div></div>
+  ${m.tracking ? `<div class="card" style="margin-bottom:12px">${trackLine(m, true)}</div>` : ''}
   ${kpiRow(A, B)}
   <div class="charts" style="margin-top:12px">
     <div class="card chart-card"><h3>Daily spend</h3><div class="csub">All campaigns in this market</div><div class="chart" data-chart="cost"></div></div>
-    <div class="card chart-card"><h3>Daily conversions</h3><div class="csub">Sign-ups + purchases</div><div class="chart" data-chart="conversions"></div></div>
+    <div class="card chart-card"><h3>Daily conversions</h3><div class="csub">Callback leads + purchases</div><div class="chart" data-chart="conversions"></div></div>
   </div>
   <h2 class="sec">Conversions by action</h2>
   <div class="split">
-    ${[['signups','Sign-ups'],['purchases','Purchases']].map(([k, l]) => `<div class="card kpi"><div class="lbl">${l}</div>
-      <div class="val">${fmt.int(A[k])}</div>${delta(A[k], B[k], 'up')} <span class="delta vs">· ${A[k] ? fmt.money2(A.cost / A[k]) + ' each' : '—'}</span></div>`).join('')}
-    <div class="card kpi"><div class="lbl">Sign-up → purchase</div><div class="val">${A.conversions ? fmt.pct(A.purchases / A.conversions).replace(/\.\d+%/, '%') : '—'}</div><span class="delta vs">share of conversions that are purchases</span></div>
+    ${[['leads','Callback leads'],['purchases','Online purchases']].map(([k, l]) => `<div class="card kpi"><div class="lbl">${l}</div>
+      <div class="val">${fmt.int(A[k])}</div>${delta(A[k], B[k], 'up')} <span class="delta vs">· ${A[k] ? fmt.money2(A.cost / A[k], A.cur) + ' each' : '—'}</span></div>`).join('')}
+    <div class="card kpi"><div class="lbl">Purchase share</div><div class="val">${A.conversions ? fmt.pct(A.purchases / A.conversions).replace(/\.\d+%/, '%') : '—'}</div><span class="delta vs">share of conversions that are purchases</span></div>
   </div>
   <h2 class="sec">Campaigns</h2>
   <div class="table-wrap"><table>
@@ -612,20 +646,20 @@ function viewMarket(id){
     <tbody>${campRows.map(({ c, a }) => `<tr class="link" onclick="openCampaign('${esc(c.id)}')" title="Open charts for this campaign">
       <td>${esc(c.name)}</td><td>${esc(c.type)}</td>
       <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
-      <td>${fmt.money(c.dailyBudget)}</td><td>${fmt.money(a.cost)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
-      <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a))}</td><td>${fmt.x(M.roas(a))}</td></tr>`).join('')}</tbody>
+      <td>${fmt.money(c.dailyBudget, a.cur)}</td><td>${fmt.money(a.cost, a.cur)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
+      <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a), a.cur)}</td><td>${fmt.x(M.roas(a))}</td></tr>`).join('')}</tbody>
   </table></div>
   <h2 class="sec">Waiting for review</h2>
   ${pend.length ? `<div class="mini-props">${pend.map(p => `<a class="mini-prop" href="#/reviews/pending/${esc(p.marketId)}">
       <span class="tag type">${esc(TYPE_LABEL[p.type] || p.type)}</span>${esc(p.title)}<span class="go">Review →</span></a>`).join('')}</div>`
     : `<div class="card empty" style="padding:1.25rem">Nothing waiting for review in this market.</div>`}`;
 }
-const CHART_FMT = { cost: fmt.money, clicks: fmt.int, conversions: fmt.int };
 function drawCharts(){
   const els = document.querySelectorAll('[data-chart]');
   if (!els.length) return;
-  const pts = daily(S.chartIds, period(0));
-  els.forEach(el => { const k = el.dataset.chart; lineChart(el, pts.map(p => ({ date: p.date, v: p[k] })), CHART_FMT[k]); });
+  const cur = curOf(S.chartIds), pts = daily(S.chartIds, period(0), cur);
+  const f = { cost: v => fmt.money(v, cur), clicks: fmt.int, conversions: fmt.int };
+  els.forEach(el => { const k = el.dataset.chart; lineChart(el, pts.map(p => ({ date: p.date, v: p[k] })), f[k]); });
 }
 
 function viewCampaigns(){
@@ -642,7 +676,7 @@ function viewCampaigns(){
   const chart = (k, title) => `<div class="card chart-card"><h3>${title}</h3><div class="csub">${esc(scope)} · per day</div><div class="chart" data-chart="${k}"></div></div>`;
   return `
   <div class="page-head"><div><h1>Campaigns</h1>
-    <div class="sub">Showing <b>${esc(scope)}</b> · ${dShort(cur.start)} – ${dShort(cur.end)}</div></div></div>
+    <div class="sub">Showing <b>${esc(scope)}</b> · ${dShort(cur.start)} – ${dShort(cur.end)} · figures in ${esc(A.cur)}</div></div></div>
   <div class="filters">
     Market <select class="select" onchange="setCampMarket(this.value)">
       <option value="all">All markets</option>
@@ -664,8 +698,8 @@ function viewCampaigns(){
       <td><input type="checkbox" ${on ? 'checked' : ''} aria-label="Include ${esc(c.name)}" onclick="event.stopPropagation();toggleCamp('${esc(c.id)}')"></td>
       <td style="text-align:left">${m ? flags(m) : ''}${esc(c.name)}</td>
       <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
-      <td>${fmt.money(a.cost)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
-      <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a))}</td><td>${fmt.x(M.roas(a))}</td></tr>`; }).join('')}</tbody>
+      <td>${fmt.money(a.cost, a.cur)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
+      <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a), a.cur)}</td><td>${fmt.x(M.roas(a))}</td></tr>`; }).join('')}</tbody>
   </table></div>`;
 }
 
@@ -680,10 +714,10 @@ function evidence(p){
   const p30 = { start: iso(addDays(today0(), -30)), end: iso(addDays(today0(), -1)) };
   const a = aggFor([c.id], p30), mk = aggFor(idsOf(campaignsOf(p.marketId)), p30);
   return `<div class="evidence">
-    <span>Spend 30d <b>${fmt.money(a.cost)}</b></span>
+    <span>Spend 30d <b>${fmt.money(a.cost, a.cur)}</b></span>
     <span>Conv. 30d <b>${fmt.int(a.conversions)}</b></span>
-    <span>Campaign CPA <b>${fmt.money2(M.cpa(a))}</b></span>
-    <span>Market CPA <b>${fmt.money2(M.cpa(mk))}</b></span>
+    <span>Campaign CPA <b>${fmt.money2(M.cpa(a), a.cur)}</b></span>
+    <span>Market CPA <b>${fmt.money2(M.cpa(mk), mk.cur)}</b></span>
     <span>CTR <b>${fmt.pct(M.ctr(a))}</b></span></div>`;
 }
 function creativeSvg(c, i){
@@ -842,123 +876,121 @@ function mulberry32(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = M
 function loadSample(){
   const rnd = mulberry32(11);
   S.markets = [
-    { id:'br-us', name:'Brazilians in USA', origin:'BR', host:'US', flags:['🇧🇷','🇺🇸'], cities:['Boston','Orlando','Newark'], language:'Portuguese' },
-    { id:'br-pt', name:'Brazilians in Portugal', origin:'BR', host:'PT', flags:['🇧🇷','🇵🇹'], cities:['Lisbon','Porto','Braga'], language:'Portuguese' },
-    { id:'il-us', name:'Israelis in USA', origin:'IL', host:'US', flags:['🇮🇱','🇺🇸'], cities:['New York','Los Angeles','Miami'], language:'Hebrew & English' },
-    { id:'gb-es', name:'British in Spain', origin:'GB', host:'ES', flags:['🇬🇧','🇪🇸'], cities:['Alicante','Málaga','Mallorca'], language:'English' },
-    { id:'us-mx', name:'Americans in Mexico', origin:'US', host:'MX', flags:['🇺🇸','🇲🇽'], cities:['San Miguel de Allende','Lake Chapala','Mexico City'], language:'English' },
-    { id:'ca-us', name:'Canadians in USA', origin:'CA', host:'US', flags:['🇨🇦','🇺🇸'], cities:['Florida','Arizona','California'], language:'English' },
+    { id:'il', name:'Israel', subtitle:'Number porting · Israelis abroad & olim from the US/Canada', flags:['🇮🇱'],
+      language:'Hebrew & English', currency:'ILS', usdRate:0.27,
+      tracking:{ status:'not_recording', lastConversion:'2026-08-14',
+        note:'The site never sends the purchase event, and Tag Manager is skipped on iPhones and iPads. Nothing new launches until "Purchase (GAds)" shows Recording.' } },
+    { id:'br', name:'Brazil', subtitle:'Brazilians abroad · calls and numbers', flags:['🇧🇷'],
+      language:'Portuguese & English', currency:'USD', usdRate:1,
+      tracking:{ status:'check', note:'Uses the same Tag Manager container as Israel, so it has the same problem; the same site fix repairs it. Confirm after the fix.' } },
   ];
-  const tune = { 'br-us':{ scale:1.6, cvr:1.25, trend:.25 }, 'br-pt':{ scale:.9, cvr:1.05, trend:.1 }, 'il-us':{ scale:1.1, cvr:1, trend:-.05 },
-                 'gb-es':{ scale:.7, cvr:.95, trend:.15 }, 'us-mx':{ scale:.6, cvr:.9, trend:0 }, 'ca-us':{ scale:.8, cvr:.55, trend:-.2 } };
-  const profile = { 'Search':{ impr:2200, ctr:.055, cpc:1.10, cvr:.085 }, 'Performance Max':{ impr:9000, ctr:.012, cpc:.70, cvr:.06 },
-                    'Display':{ impr:14000, ctr:.005, cpc:.35, cvr:.025 }, 'YouTube':{ impr:11000, ctr:.004, cpc:.30, cvr:.02 } };
-  const short = { 'br-us':'BR→US', 'br-pt':'BR→PT', 'il-us':'IL→US', 'gb-es':'UK→ES', 'us-mx':'US→MX', 'ca-us':'CA→US' };
+  // [marketId, key, name, type, dailyBudget, cpc, ctr, cvr, leadShare, trend, status]
+  // Israel follows the strategy doc (₪9,000/month example split); Brazil is a placeholder.
   const defs = [
-    ['br-us','Search','Ligações para o Brasil'], ['br-us','Performance Max','Recarga'], ['br-us','Display','Remarketing'],
-    ['br-pt','Search','Chamadas para o Brasil'], ['br-pt','Performance Max','Recarga'],
-    ['il-us','Search','Call Israel'], ['il-us','Performance Max','Stay close'], ['il-us','YouTube','Holidays video'],
-    ['gb-es','Search','Call the UK'], ['gb-es','Display','Expat forums'],
-    ['us-mx','Search','Call home to the US'], ['us-mx','YouTube','Snowbird video'],
-    ['ca-us','Search','Call Canada'], ['ca-us','Display','Snowbirds FL/AZ'], ['ca-us','Performance Max','Winter', 20],
+    ['il','c1','Israelis – Before moving','Search',   59, 2.4, .065, .060, .60,  .10],
+    ['il','c2','Israelis – Already abroad','Search',  74, 5.8, .058, .100, .60,  .30],
+    ['il','c3','Olim – Before moving','Search',       44, 7.2, .052, .050, .55,  .05],
+    ['il','c4','Olim – In Israel','Search',           44, 3.1, .061, .062, .55,  .15],
+    ['il','c5','Brand','Search',                      30, 1.4, .240, .130, .30,  0  ],
+    ['il','c6','Competitors','Search',                30, 4.2, .038, .030, .50, -.05],
+    ['il','c7','Remarketing (phase 2)','Display',     15, .9,  .006, .020, .40,  0, 'PAUSED'],
+    ['il','pmax','Performance Max (legacy)','Performance Max', 90, 1.6, .012, .018, .30, 0],
+    ['br','keep','Keep your Brazilian number','Search', 35, 1.20, .055, .065, .55, .15],
+    ['br','calls','Calls to Brazil','Search',           25, 0.90, .060, .080, .20, 0  ],
+    ['br','brand','Brand','Search',                      8, 0.40, .220, .140, .25, 0  ],
+    ['br','pmax','Performance Max','Performance Max',   30, 0.50, .011, .025, .30, -.1],
   ];
-  const DAYS = 182, start = addDays(today0(), -DAYS);
-  const rows = [];
-  S.campaigns = defs.map(([marketId, type, label, pausedDaysAgo]) => {
-    const id = `${marketId}-${type.toLowerCase().replace(/\s+/g, '-')}`;
-    const t = tune[marketId], pr = profile[type];
-    const fatigue = id === 'il-us-performance-max', weak = id === 'ca-us-display' ? .4 : id === 'us-mx-youtube' ? .6 : 1;
-    let recentCost = 0;
-    for (let i = 0; i < DAYS; i++) {
-      if (pausedDaysAgo && i >= DAYS - pausedDaysAgo) break;
-      const d = addDays(start, i), wk = [0, 6].includes(d.getDay()) ? 1.12 : 1;
-      const mult = t.scale * (1 + t.trend * (i / DAYS - .5)) * wk * (.85 + rnd() * .3);
-      const impressions = Math.round(pr.impr * mult);
-      const clicks = Math.round(impressions * pr.ctr * (fatigue ? 1.15 - .45 * i / DAYS : 1) * (.9 + rnd() * .2));
-      const cost = +(clicks * pr.cpc * (.9 + rnd() * .2)).toFixed(2);
-      const conversions = Math.floor(clicks * pr.cvr * t.cvr * weak * (.8 + rnd() * .4) + rnd());
-      const purchases = Math.min(conversions, Math.floor(conversions * (.35 + rnd() * .1) + rnd()));
-      const value = +(purchases * (28 + rnd() * 20)).toFixed(2);
-      rows.push({ campaignId:id, marketId, date: iso(d), impressions, clicks, cost, conversions, signups: conversions - purchases, purchases, value });
-      if (i >= DAYS - 14) recentCost += cost;
+  const orderValue = { il: [26, 92], br: [8, 25] };    // first order, account currency
+  const leadValue = { il: 174, br: 40 };                // ≈ 40% close rate × lifetime value
+  const DAYS = 182, start = addDays(today0(), -DAYS), rows = [];
+  S.campaigns = defs.map(([marketId, key, label, type, budget, cpc, ctr, cvr, leadShare, trend, status = 'ENABLED']) => {
+    const id = `${marketId}-${key}`;
+    if (status === 'ENABLED') for (let i = 0; i < DAYS; i++) {
+      const d = addDays(start, i), wk = [5, 6].includes(d.getDay()) ? .9 : 1.03;
+      const cost = +(budget * (.82 + rnd() * .18) * (1 + trend * (i / DAYS - .5)) * wk).toFixed(2);
+      const clicks = Math.max(0, Math.round(cost / (cpc * (.85 + rnd() * .3))));
+      const impressions = Math.round(clicks / (ctr * (.85 + rnd() * .3)));
+      const conversions = Math.floor(clicks * cvr * (.75 + rnd() * .5) + rnd());
+      const leads = Math.min(conversions, Math.floor(conversions * leadShare + rnd()));
+      const purchases = conversions - leads;
+      const [lo, hi] = orderValue[marketId];
+      const value = +(purchases * (lo + rnd() * (hi - lo)) + leads * leadValue[marketId]).toFixed(2);
+      rows.push({ campaignId:id, marketId, date: iso(d), impressions, clicks, cost, conversions, leads, purchases, value });
     }
-    return { id, marketId, type, name: `${short[marketId]} · ${type} · ${label}`,
-             status: pausedDaysAgo ? 'PAUSED' : 'ENABLED',
-             dailyBudget: recentCost / 14 > 40 ? Math.round(recentCost / 14 * 1.04 / 5) * 5 : Math.max(5, Math.round(recentCost / 14 * 1.04)) };
+    return { id, marketId, type, name: `${marketId === 'il' ? 'IL' : 'BR'} · ${label}`, status, dailyBudget: budget };
   });
   indexStats(rows);
 
-  const budget = id => S.campaigns.find(c => c.id === id).dailyBudget;
+  const ils = v => fmt.money(v, 'ILS'), usd = v => fmt.money(v, 'USD');
   const hrs = h => new Date(Date.now() - h * 36e5);
-  const round5 = v => Math.round(v / 5) * 5;
-  const brSearch = budget('br-us-search'), mxYt = budget('us-mx-youtube');
   S.proposalsBase = [
-    { id:'p-101', marketId:'br-us', campaignId:'br-us-search', type:'budget_increase', level:'approval', source:'Weekly review', createdAt:hrs(5), status:'pending',
-      title:'Raise daily budget on BR→US Search',
-      change:{ label:'Daily budget', from:fmt.money(brSearch), to:fmt.money(round5(brSearch * 1.35)) },
-      rationale:'This campaign runs out of budget by early afternoon on most days and is losing about a third of eligible impressions to budget. Its cost per conversion is the lowest in the account and has held steady while volume grew, so extra budget should buy more of the same conversions rather than weaker ones.',
-      impact:'+20–30% conversions in this market at a similar cost per conversion' },
-    { id:'p-102', marketId:'ca-us', campaignId:'ca-us-display', type:'pause_campaign', level:'approval', source:'Daily rules', createdAt:hrs(9), status:'pending',
-      title:'Pause CA→US Display (Snowbirds FL/AZ)',
+    { id:'p-201', marketId:'il', campaignId:'il-pmax', type:'pause_campaign', level:'approval', source:'Daily rules', createdAt:hrs(4), status:'pending',
+      title:'Pause Israel Performance Max until purchases record',
       change:{ label:'Status', from:'Active', to:'Paused' },
-      rationale:'Cost per conversion is more than double the market average and has not improved in 30 days. Almost no purchases come from this campaign; the few conversions are sign-ups that rarely convert. Pausing frees the budget for CA→US Search, which converts far better.',
-      impact:'Saves the full Display budget; little expected loss in purchases' },
-    { id:'p-103', marketId:'il-us', campaignId:'il-us-performance-max', type:'new_creatives', level:'approval', source:'Weekly review', createdAt:hrs(26), status:'pending',
-      title:'Refresh images for IL→US Performance Max',
-      rationale:'Click-through rate on this campaign has dropped steadily for about two months while impressions stayed flat — the classic sign of creative fatigue. The image tool generated three new variants from the brand kit. Approving adds them to the asset group alongside the current images; the weakest current asset is removed after 14 days if the new ones win.',
+      rationale:'Performance Max takes most of the Israel budget but has had no conversion data since Aug 14, so it is bidding blind. The strategy says to pause or reduce it until "Purchase (GAds)" shows Recording, and to bring it back later with brand search excluded.',
+      impact:'Frees about ₪90/day for the Search campaigns, which follow the new strategy' },
+    { id:'p-202', marketId:'il', campaignId:'il-c3', type:'bid_strategy', level:'approval', source:'Weekly review', createdAt:hrs(7), status:'pending',
+      title:'Switch Olim – Before moving to Maximize clicks',
+      change:{ label:'Bid strategy', from:'Target CPA', to:'Maximize clicks (CPC cap ₪8)' },
+      rationale:'With no conversions being recorded, Target CPA has nothing to learn from and throttles the campaign. Phase 1 of the strategy runs Search on Maximize clicks with a CPC cap near the top-of-page bid until 15–30 conversions per campaign come in.',
+      impact:'More impressions on aliyah searches while tracking is being fixed' },
+    { id:'p-203', marketId:'il', campaignId:'il-c2', type:'new_creatives', level:'approval', source:'Weekly review', createdAt:hrs(26), status:'pending',
+      title:'New images for Israelis – Already abroad',
+      rationale:'The "already moved" message from the strategy is not in any image asset yet. The image tool made three variants from the 011 Global brand kit using the approved headlines. Approving adds them to the campaign\'s image assets.',
       creatives:[
-        { headline:'Call Israel like you never left', sub:'Crystal-clear calls to family, any time', cta:'Start now', bg:'#1A1A1A', fg:'#FFFFFF', accent:'#EE7805', note:'Dark, brand orange' },
-        { headline:'Shabbat dinner calls, sorted', sub:'Low rates to Israeli mobiles and landlines', cta:'See rates', bg:'#FDF0E3', fg:'#1A1A1A', accent:'#EE7805', note:'Light, warm' },
-        { headline:'קרוב לבית, תמיד', sub:'Unlimited calling to Israel from the US', cta:'Try it', bg:'#EE7805', fg:'#FFFFFF', accent:'#1A1A1A', note:'Hebrew headline', rtl:true },
+        { headline:'Already moved? It\'s not too late', sub:'Keep your +972 number. We handle the porting.', cta:'Call me back', bg:'#1A1A1A', fg:'#FFFFFF', accent:'#EE7805', note:'English, dark' },
+        { headline:'עברתם כבר? עוד לא מאוחר', sub:'Don\'t cancel your line. Port it.', cta:'דברו איתנו', bg:'#EE7805', fg:'#FFFFFF', accent:'#1A1A1A', note:'Hebrew headline', rtl:true },
+        { headline:'Bank SMS codes, anywhere', sub:'A real mobile number, not VoIP. From $6.99/mo', cta:'See plans', bg:'#FDF0E3', fg:'#1A1A1A', accent:'#EE7805', note:'English, light' },
       ],
-      impact:'Recover CTR toward its level two months ago' },
-    { id:'p-104', marketId:'gb-es', campaignId:'gb-es-search', type:'add_keywords', level:'approval', source:'Weekly review', createdAt:hrs(28), status:'pending',
-      title:'Add 6 keywords to UK→ES Search',
-      rationale:'Search terms report shows these queries already triggering ads through broad match with good conversion rates. Adding them as phrase match gives them their own bids and ad copy.',
-      keywords:['"call uk landline from spain"','"cheap calls to england"','"uk mobile calls from spain"','"call nhs from abroad"','"international calls spain to uk"','"expat phone plan spain"'],
-      impact:'+8–12 conversions / month' },
-    { id:'p-105', marketId:'us-mx', campaignId:'us-mx-youtube', type:'budget_decrease', level:'auto_limit', source:'Daily rules', createdAt:hrs(3), status:'pending',
-      title:'Trim US→MX YouTube budget by 15%',
-      change:{ label:'Daily budget', from:fmt.money(mxYt), to:fmt.money(Math.round(mxYt * .85)) },
-      rationale:'Views are cheap, but this campaign costs more per conversion than the rest of the market and brings few purchases. This is within the ±15% automatic limit, so it applies on its own unless you reject it.' },
-    { id:'p-106', marketId:'ca-us', campaignId:'ca-us-search', type:'bid_strategy', level:'approval', source:'Weekly review', createdAt:hrs(30), status:'pending',
-      title:'Switch CA→US Search to Target CPA bidding',
-      change:{ label:'Bid strategy', from:'Maximize clicks', to:'Target CPA' },
-      rationale:'The campaign now has enough conversion history (30+ in the last 30 days) for Google to bid toward cost per conversion instead of clicks. Maximize clicks is buying cheap traffic that does not convert.',
-      impact:'Lower cost per conversion after a 1–2 week learning period' },
-    { id:'p-090', marketId:'br-us', campaignId:'br-us-performance-max', type:'budget_increase', level:'approval', source:'Weekly review', createdAt:hrs(24 * 8), status:'approved',
+      impact:'Better click-through on the highest-intent audience' },
+    { id:'p-204', marketId:'il', campaignId:'il-c1', type:'add_negative_keywords', level:'auto_limit', source:'Daily rules', createdAt:hrs(3), status:'pending',
+      title:'Add the tourist negative list to Israelis – Before moving',
+      rationale:'Tourist eSIM searches are triggering the porting ads. The strategy routes these to the Globusim account instead. Negative keywords are low risk, so this applies on its own unless you reject it.',
+      keywords:['tourist','תייר','"sim card for tourists"','"esim israel trip"','"israel travel sim"'] },
+    { id:'p-205', marketId:'il', campaignId:'il-c2', type:'budget_increase', level:'approval', source:'Weekly review', createdAt:hrs(28), status:'pending',
+      title:'Raise budget on Israelis – Already abroad',
+      change:{ label:'Daily budget', from:ils(74), to:ils(95) },
+      rationale:'This campaign reaches the highest-intent audience and runs out of budget before the US evening, when Israelis abroad search most. Its cost per conversion stays close to the market average despite pricier US clicks, so more budget should buy more of the same leads.',
+      impact:'+20–25% callback leads from Israelis abroad' },
+    { id:'p-206', marketId:'br', campaignId:'br-calls', type:'budget_decrease', level:'auto_limit', source:'Daily rules', createdAt:hrs(5), status:'pending',
+      title:'Trim Calls to Brazil budget by 15%',
+      change:{ label:'Daily budget', from:usd(25), to:usd(21) },
+      rationale:'Spend is steady but conversions are flat. This is within the ±15% automatic limit, so it applies on its own unless you reject it.' },
+    { id:'p-207', marketId:'br', campaignId:'br-keep', type:'add_keywords', level:'approval', source:'Weekly review', createdAt:hrs(30), status:'pending',
+      title:'Add Portuguese porting keywords to Keep your Brazilian number',
+      rationale:'Sample suggestion — the Brazil market has no strategy doc yet. These are searches Brazilians abroad commonly use when keeping their number.',
+      keywords:['"manter número brasileiro no exterior"','"portabilidade número brasileiro"','"número brasileiro nos eua"','"receber sms do banco no exterior"','"chip brasileiro no exterior"'] },
+    { id:'p-190', marketId:'il', campaignId:'il-c5', type:'budget_increase', level:'approval', source:'Weekly review', createdAt:hrs(24 * 8), status:'approved',
       decidedBy:'Sample reviewer', decidedAt:hrs(24 * 7.8), decisionNote:'',
-      title:'Raise daily budget on BR→US Performance Max',
-      change:{ label:'Daily budget', from:'$55', to:'$65' },
-      rationale:'Budget-limited with a cost per conversion below the market average.', impact:'+10–15% conversions' },
-    { id:'p-091', marketId:'il-us', campaignId:'il-us-youtube', type:'pause_campaign', level:'approval', source:'Daily rules', createdAt:hrs(24 * 9), status:'rejected',
-      decidedBy:'Sample reviewer', decidedAt:hrs(24 * 8.5), decisionNote:'Keep running through the holiday season, revisit in October.',
-      title:'Pause IL→US YouTube (Holidays video)',
-      change:{ label:'Status', from:'Active', to:'Paused' },
-      rationale:'Low conversion rate compared with Search and Performance Max in this market.' },
+      title:'Raise Brand budget (Israel)', change:{ label:'Daily budget', from:ils(20), to:ils(30) },
+      rationale:'Brand searches were being cut off by budget in the afternoon.', impact:'Capture all brand searches' },
+    { id:'p-191', marketId:'br', campaignId:'br-pmax', type:'pause_campaign', level:'approval', source:'Daily rules', createdAt:hrs(24 * 9), status:'rejected',
+      decidedBy:'Sample reviewer', decidedAt:hrs(24 * 8.5), decisionNote:'Keep it running until we have a Brazil strategy.',
+      title:'Pause Brazil Performance Max', change:{ label:'Status', from:'Active', to:'Paused' },
+      rationale:'Same tracking problem as Israel: bidding without conversion data.' },
   ];
 
   const monday = d => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
   const w0 = monday(today0()), w1 = addDays(w0, -7);
   S.reviews = [
     { id:'w0', weekOf: iso(w0), author:'Claude · weekly review (sample)',
-      summary:'Brazilians in USA keeps carrying the account: it has the most conversions and the lowest cost per conversion, and its Search campaign is held back by budget. Canadians in USA is the weak spot — Display spend there is producing sign-ups that almost never turn into purchases. Israeli creatives are wearing out.',
-      highlights:['BR→US Search: best cost per conversion in the account, still budget-limited', 'UK→ES: steady growth; several converting search terms are ready to become keywords', 'BR→PT: stable, no action needed'],
-      concerns:['CA→US Display: cost per conversion more than 2× market average — proposed pause', 'IL→US Performance Max: CTR sliding for ~8 weeks — new images proposed', 'US→MX YouTube: cheap views, very few sign-ups'] },
+      summary:'Tracking is still the main issue: Google Ads has recorded no purchases since Aug 14, so every automated bid strategy is flying blind. Until the site fix ships, the priority is to stop blind spending (Performance Max) and run Search on Maximize clicks. Israelis before moving and Olim in Israel convert cheapest; Israelis already abroad is held back by budget.',
+      highlights:['Israelis – Already abroad: out of budget most days; conversions holding up despite pricier US clicks', 'Brand (Israel): capturing nearly all brand searches after last week\'s budget change', 'Olim – In Israel: cheap clicks, steady lead flow'],
+      concerns:['Performance Max (Israel): biggest single spend with no conversion data — proposed pause', 'Olim – Before moving: throttled by Target CPA — proposed switch to Maximize clicks', 'Brazil: same tracking problem; no strategy yet'] },
     { id:'w1', weekOf: iso(w1), author:'Claude · weekly review (sample)',
-      summary:'Quiet week. Approved budget increase on BR→US Performance Max is spending fully without raising cost per conversion. Holiday video in IL→US kept running per your note.',
-      highlights:['BR→US Performance Max absorbed the extra budget at a similar cost per conversion'],
-      concerns:['CA→US conversions down week over week — watching one more week before proposing changes'] },
+      summary:'First week on the new Israel structure. Search terms were mostly on target; tourist eSIM searches leaking into Israelis – Before moving need the tourist negative list.',
+      highlights:['Hebrew porting keywords ("ניוד מספר ישראלי", "שמירת מספר ישראלי בחו״ל") getting clicks at low cost'],
+      concerns:['Tourist searches in campaign 1 — send to Globusim', 'Callback times not tracked yet'] },
   ];
   S.activityBase = [
     { at: hrs(2), actor:'System', text:'Daily sync from Google Ads completed (sample)' },
-    { at: hrs(3), actor:'Daily rules', marketId:'us-mx', text:'Proposed: trim US→MX YouTube budget by 15% (auto-applies in 24h unless rejected)' },
-    { at: hrs(9), actor:'Daily rules', marketId:'ca-us', text:'Alert: CA→US Display cost per conversion above 2× market average for 30 days' },
-    { at: hrs(26), actor:'Image tool', marketId:'il-us', text:'Generated 3 image variants for IL→US Performance Max' },
+    { at: hrs(2.5), actor:'Tracking check', marketId:'il', text:'Alert: 0 purchases recorded in the last 24h (none since Aug 14)' },
+    { at: hrs(3), actor:'Daily rules', marketId:'il', text:'Proposed: tourist negative list for Israelis – Before moving (auto-applies in 24h unless rejected)' },
+    { at: hrs(4), actor:'Daily rules', marketId:'il', text:'Proposed: pause Performance Max until purchases record' },
+    { at: hrs(26), actor:'Image tool', marketId:'il', text:'Generated 3 image variants for Israelis – Already abroad' },
     { at: hrs(30), actor:'Weekly review', text:'Weekly review posted with 4 proposals' },
-    { at: hrs(24 * 3), actor:'Daily rules', marketId:'br-pt', text:'Auto-applied: added 9 negative keywords to BR→PT Search ("grátis", "whatsapp", …)' },
-    { at: hrs(24 * 7.8), actor:'Sample reviewer', marketId:'br-us', text:'Approved: raise daily budget on BR→US Performance Max ($55 → $65)' },
-    { at: hrs(24 * 8.5), actor:'Sample reviewer', marketId:'il-us', text:'Rejected: pause IL→US YouTube — “Keep running through the holiday season”' },
+    { at: hrs(24 * 7.8), actor:'Sample reviewer', marketId:'il', text:'Approved: raise Brand budget (₪20 → ₪30)' },
+    { at: hrs(24 * 8.5), actor:'Sample reviewer', marketId:'br', text:'Rejected: pause Brazil Performance Max — “Keep it running until we have a Brazil strategy”' },
   ];
 }
 </script>

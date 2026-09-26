@@ -2,10 +2,12 @@
 
 ## Project Overview
 Marketing dashboard for **011 Global**'s Google Ads campaigns, which target
-diaspora calling corridors (e.g. Brazilians in USA, Israelis in USA). Three sections:
+Israel and Brazil markets. Three sections:
 
-1. **Performance** — campaigns and conversions grouped by **market**
-   (a market = one diaspora corridor, origin → host country). Overview of all
+1. **Performance** — campaigns and conversions grouped by **market**. Two markets:
+   **Israel** (number porting, per the strategy doc — Israelis abroad and US/Canadian
+   olim, 7 campaigns + legacy Performance Max, account in ILS) and **Brazil**
+   (placeholder campaigns until it has a strategy, USD). Overview of all
    markets plus a detail page per market (daily spend/conversions, conversions
    by action, campaign table, pending proposals).
 2. **Campaigns** — spend, clicks and conversions charts for all campaigns, or
@@ -35,6 +37,11 @@ file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global: `logo.png` (trimm
   daily rule checks, weekly Claude review, image/video generation. Writes into
   the collections below; this site only reads them and records decisions.
 
+## Currency
+Each market's pages show its account currency. Anything mixing markets (overview
+totals, Campaigns page across markets) is converted to USD with `usdRate`
+(`curOf()`, `aggFor(ids, period, cur)`).
+
 ## Data modes
 - **Sample** — shown while `mkt_markets` is empty (or unreadable). Data is generated
   in `loadSample()` with a seeded RNG. Approve/Reject still persists, but to
@@ -43,9 +50,9 @@ file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global: `logo.png` (trimm
   "Sample data" to "Live".
 
 ## Firestore Collections (written by the backend unless noted)
-- `mkt_markets/{id}` — {name, origin, host, flags:[originEmoji, hostEmoji], cities[], language}
+- `mkt_markets/{id}` — {name, subtitle, flags:[emoji], language, currency ('ILS'|'USD'…, the Google Ads account currency), usdRate (USD per 1 unit, for cross-market totals), tracking:{status ('recording'|'not_recording'|'check'), lastConversion 'YYYY-MM-DD', note}}
 - `mkt_campaigns/{id}` — {marketId, name, type (Search|Performance Max|Display|YouTube), status (ENABLED|PAUSED), dailyBudget, googleAdsId}
-- `mkt_dailyStats/{campaignId_date}` — {campaignId, marketId, date 'YYYY-MM-DD', impressions, clicks, cost, conversions, signups, purchases, value}
+- `mkt_dailyStats/{campaignId_date}` — {campaignId, marketId, date 'YYYY-MM-DD', impressions, clicks, cost, conversions, leads (callback form), purchases, value} — cost/value in the market's currency
 - `mkt_proposals/{id}` — {marketId, campaignId, type, level (approval|auto_limit), source, title, rationale, impact, change:{label,from,to}, keywords[], creatives[], createdAt, status (pending|approved|rejected|applied)}.
   **The site writes** `status, decidedBy, decidedByEmail, decidedAt, decisionNote` on Approve/Reject; the backend applies approved ones and sets `applied`.
 - `mkt_reviews/{id}` — weekly agent review: {weekOf 'YYYY-MM-DD', author, summary, highlights[], concerns[]}
