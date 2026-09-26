@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>011 Telecom — Marketing</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 52 34'%3E%3Ccircle cx='7' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='7' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='45' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='7' cy='31' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='31' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='31' r='5' fill='%23F47B20'/%3E%3C/svg%3E">
+<style>
+:root{--orange:#F47B20;--orange-light:#FEF0E4;--orange-dark:#C5610F;--dark:#1A1A1A;--mid:#555;--muted:#888;--border:#E5E5E5;--bg:#F7F7F5;--white:#FFFFFF;--green:#0F6E56;--green-light:#E1F5EE;--red:#A32D2D;--red-light:#FCEBEB;--amber:#8A5A00;--amber-light:#FFF4D6;--radius:10px;--radius-sm:6px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh;font-size:14px;}
+a{color:inherit;}
+button{font-family:inherit;}
+
+/* Auth — same look as deals.011telecom.com */
+#auth-screen{display:none;align-items:center;justify-content:center;min-height:100vh;padding:1rem;}
+.auth-card{background:var(--white);border-radius:16px;border:1px solid var(--border);padding:2.5rem;width:100%;max-width:420px;}
+.auth-card .logo{margin-bottom:2rem;}
+.auth-card h2{font-size:21px;font-weight:700;margin-bottom:5px;}
+.auth-card p{color:var(--muted);font-size:13px;margin-bottom:1.5rem;}
+.form-group{margin-bottom:1rem;}
+.form-group label{display:block;font-size:11px;font-weight:700;color:var(--mid);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+.form-group input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--white);color:var(--dark);outline:none;}
+.form-group input:focus{border-color:var(--orange);}
+.btn-primary{width:100%;padding:11px;background:var(--orange);color:white;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;}
+.btn-primary:hover{background:var(--orange-dark);}
+.btn-google{width:100%;padding:10px;background:var(--white);color:var(--dark);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-google svg{width:18px;height:18px;}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:1rem 0;color:var(--muted);font-size:12px;}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.auth-msg{padding:10px 12px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:1rem;display:none;background:var(--red-light);color:var(--red);}
+
+/* Top bar */
+#app-screen{display:none;min-height:100vh;}
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 1.5rem;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;flex-wrap:wrap;}
+.topbar-left,.topbar-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.logo{display:flex;align-items:center;gap:9px;font-size:19px;font-weight:800;color:var(--dark);text-decoration:none;letter-spacing:-0.01em;}
+.logo .logo-iso circle{fill:var(--orange);}
+.logo em{color:var(--orange);font-style:normal;margin-left:5px;}
+.app-name{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding-left:10px;margin-right:10px;border-left:1px solid var(--border);}
+.nav-btn{padding:6px 11px;border-radius:var(--radius-sm);border:none;background:transparent;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+.nav-btn:hover{color:var(--dark);background:var(--bg);}
+.nav-btn.active{color:var(--orange);background:var(--orange-light);}
+.count{background:var(--orange);color:#fff;font-size:10.5px;font-weight:700;border-radius:9px;padding:1px 6px;}
+.select{padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--white);font-size:12.5px;color:var(--dark);cursor:pointer;}
+.pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--amber-light);color:var(--amber);white-space:nowrap;}
+.pill.live{background:var(--green-light);color:var(--green);}
+.user{font-size:12.5px;color:var(--muted);}
+.btn{padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--white);font-size:12.5px;font-weight:600;cursor:pointer;color:var(--dark);}
+.btn:hover{border-color:var(--muted);}
+.btn.approve{background:var(--green);border-color:var(--green);color:#fff;}
+.btn.approve:hover{background:#0b5745;}
+.btn.reject{color:var(--red);}
+.btn.reject:hover{border-color:var(--red);}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted);}
+
+/* Layout */
+main{max-width:1280px;margin:0 auto;padding:1.5rem;}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.page-head h1{font-size:22px;font-weight:800;letter-spacing:-.01em;}
+.page-head .sub{color:var(--muted);font-size:13px;margin-top:3px;}
+.crumb{font-size:12.5px;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:8px;}
+.crumb:hover{color:var(--orange);}
+h2.sec{font-size:13px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.05em;margin:1.75rem 0 .75rem;}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;}
+.empty{color:var(--muted);text-align:center;padding:2.5rem 1rem;}
+.loading{color:var(--muted);text-align:center;padding:5rem 1rem;}
+
+/* KPI tiles */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,1fr);}}
+.kpi .lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.kpi .val{font-size:24px;font-weight:800;margin:6px 0 4px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;}
+.delta{font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
+.delta.good{color:var(--green);}
+.delta.bad{color:var(--red);}
+.delta .vs{font-weight:400;color:var(--muted);}
+
+/* Market cards */
+.markets{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.mcard{display:block;text-decoration:none;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;transition:border-color .15s,box-shadow .15s;}
+.mcard:hover{border-color:var(--orange);box-shadow:0 2px 10px rgba(0,0,0,.05);}
+.mhead{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;}
+.flags{font-size:22px;line-height:1;white-space:nowrap;margin-right:4px;}
+.camp .flags,td .flags,.log .flags{font-size:16px;}
+.flags .arrow{font-size:13px;color:var(--muted);margin:0 3px;vertical-align:middle;}
+.mname{font-weight:700;font-size:15px;}
+.msub{font-size:12px;color:var(--muted);margin-top:2px;}
+.mhead .pending{margin-left:auto;font-size:11px;font-weight:700;color:var(--orange-dark);background:var(--orange-light);padding:3px 8px;border-radius:20px;white-space:nowrap;}
+.mstats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.mstat .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;}
+.mstat .v{font-size:15px;font-weight:700;margin:3px 0 1px;font-variant-numeric:tabular-nums;}
+.mstat .delta{font-size:11px;}
+.spark{margin-top:12px;border-top:1px solid var(--border);padding-top:10px;}
+.spark .l{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;}
+.spark svg{display:block;width:100%;height:36px;margin-top:4px;}
+
+/* Tables */
+.table-wrap{overflow-x:auto;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:right;padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;background:#FBFBFA;}
+td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+th:first-child,td:first-child{text-align:left;}
+tr:last-child td{border-bottom:none;}
+tr.link{cursor:pointer;}
+tr.link:hover td{background:#FCFBF9;}
+.bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
+.bar i{display:block;height:8px;border-radius:0 4px 4px 0;background:var(--orange);min-width:2px;}
+.bar .track{width:90px;display:flex;justify-content:flex-start;}
+.status{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.status.enabled{background:var(--green-light);color:var(--green);}
+.status.paused{background:#EEE;color:var(--mid);}
+
+/* Charts */
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;}
+.chart-card h3{font-size:13px;font-weight:700;margin-bottom:2px;}
+.chart-card .csub{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.chart{position:relative;}
+.chart svg{display:block;}
+.chart .grid line{stroke:var(--border);stroke-width:1;}
+.chart .axis text{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums;}
+.chart .line{fill:none;stroke:var(--orange);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;}
+.chart .area{fill:var(--orange);opacity:.09;}
+.chart .xh{stroke:var(--mid);stroke-width:1;stroke-dasharray:3 3;}
+.chart .dot{fill:var(--orange);stroke:var(--white);stroke-width:2;}
+.tip{position:absolute;pointer-events:none;background:var(--dark);color:#fff;font-size:12px;padding:6px 9px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);display:none;font-variant-numeric:tabular-nums;}
+.tip b{display:block;font-size:13px;}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+
+/* Reviews */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:1rem;flex-wrap:wrap;}
+.tab{padding:9px 12px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;gap:6px;align-items:center;}
+.tab:hover{color:var(--dark);}
+.tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+.filters{display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap;font-size:12.5px;color:var(--muted);}
+.props{display:grid;gap:12px;}
+.prop{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;}
+.prop-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+.tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--bg);color:var(--mid);white-space:nowrap;}
+.tag.type{background:var(--orange-light);color:var(--orange-dark);}
+.tag.approval{background:var(--amber-light);color:var(--amber);}
+.tag.auto{background:#E8F0FB;color:#1F4E8C;}
+.tag.approved,.tag.applied{background:var(--green-light);color:var(--green);}
+.tag.rejected{background:var(--red-light);color:var(--red);}
+.prop-top .when{margin-left:auto;font-size:12px;color:var(--muted);}
+.prop h3{font-size:15.5px;font-weight:700;margin-bottom:4px;}
+.prop .camp{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
+.change{display:inline-flex;align-items:center;gap:10px;background:var(--bg);border-radius:var(--radius-sm);padding:8px 12px;font-size:13px;margin-bottom:10px;flex-wrap:wrap;}
+.change .from{color:var(--muted);text-decoration:line-through;}
+.change .to{font-weight:700;}
+.prop p.why{font-size:13.5px;line-height:1.55;color:#333;margin-bottom:10px;max-width:820px;}
+.evidence{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.evidence span{font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 8px;font-variant-numeric:tabular-nums;}
+.evidence span b{font-weight:700;}
+.kw{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.kw code{font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:3px 7px;font-family:ui-monospace,Menlo,monospace;}
+.creatives{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:10px;}
+.creatives figure svg{width:100%;height:auto;display:block;border-radius:var(--radius-sm);border:1px solid var(--border);}
+.creatives figcaption{font-size:11.5px;color:var(--muted);margin-top:4px;}
+.impact{font-size:12.5px;color:var(--green);font-weight:600;margin-bottom:12px;}
+.autonote{font-size:12.5px;color:#1F4E8C;margin-bottom:12px;}
+.prop-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px;}
+.prop-actions input{flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;}
+.prop-actions input:focus{outline:none;border-color:var(--orange);}
+.decided{font-size:12.5px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.decided q{font-style:italic;color:var(--mid);}
+.review h3{font-size:16px;font-weight:700;}
+.review .meta{font-size:12px;color:var(--muted);margin:2px 0 10px;}
+.review p{font-size:13.5px;line-height:1.55;margin-bottom:10px;max-width:860px;}
+.review .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;}
+.review h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:6px;}
+.review ul{padding-left:18px;font-size:13px;line-height:1.6;}
+.log{list-style:none;}
+.log li{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:baseline;}
+.log li:last-child{border-bottom:none;}
+.log .t{color:var(--muted);font-size:12px;min-width:130px;font-variant-numeric:tabular-nums;}
+.log .who{font-weight:600;min-width:150px;}
+.mini-props{display:grid;gap:8px;}
+.mini-prop{display:flex;gap:10px;align-items:center;text-decoration:none;padding:10px 12px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;}
+.mini-prop:hover{border-color:var(--orange);}
+.mini-prop .go{margin-left:auto;color:var(--orange);font-weight:600;font-size:12.5px;white-space:nowrap;}
+
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none;z-index:200;max-width:90vw;}
+#toast.error{background:var(--red);}
+
+@media (max-width:640px){
+  main{padding:1rem;}
+  .topbar{padding:8px 1rem;}
+  .app-name{display:none;}
+  .user{display:none;}
+  .topbar-left{width:100%;}
+  .topbar-right{width:100%;justify-content:flex-end;}
+  .mstats{grid-template-columns:repeat(2,1fr);}
+  .log li{flex-direction:column;gap:2px;}
+}
+</style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <a class="logo" href="#">
+      <svg class="logo-iso" viewBox="0 0 52 34" width="34" height="22" aria-hidden="true">
+        <circle cx="7" cy="7" r="5"/><circle cx="19" cy="7" r="5"/><circle cx="31" cy="7" r="5"/>
+        <circle cx="7" cy="19" r="5"/><circle cx="19" cy="19" r="5"/><circle cx="31" cy="19" r="5"/><circle cx="45" cy="19" r="5"/>
+        <circle cx="7" cy="31" r="5"/><circle cx="19" cy="31" r="5"/><circle cx="31" cy="31" r="5"/>
+      </svg>011<em>telecom</em>
+    </a>
+    <h2>Marketing</h2>
+    <p>Campaign performance by market, reviews and suggestions.</p>
+    <div id="auth-msg" class="auth-msg"></div>
+    <div class="form-group"><label>Email</label><input id="auth-email" type="email" autocomplete="email"></div>
+    <div class="form-group"><label>Password</label><input id="auth-pass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()"></div>
+    <button id="auth-btn" class="btn-primary" onclick="authSubmit()">Sign in</button>
+    <div class="auth-divider">or</div>
+    <button class="btn-google" onclick="googleSignIn()">
+      <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continue with Google
+    </button>
+  </div>
+</div>
+
+<div id="app-screen">
+  <header class="topbar">
+    <div class="topbar-left">
+      <a class="logo" href="#/performance">
+        <svg class="logo-iso" viewBox="0 0 52 34" width="34" height="22" aria-hidden="true">
+          <circle cx="7" cy="7" r="5"/><circle cx="19" cy="7" r="5"/><circle cx="31" cy="7" r="5"/>
+          <circle cx="7" cy="19" r="5"/><circle cx="19" cy="19" r="5"/><circle cx="31" cy="19" r="5"/><circle cx="45" cy="19" r="5"/>
+          <circle cx="7" cy="31" r="5"/><circle cx="19" cy="31" r="5"/><circle cx="31" cy="31" r="5"/>
+        </svg>011<em>telecom</em>
+      </a>
+      <span class="app-name">Marketing</span>
+      <a class="nav-btn" id="nav-performance" href="#/performance">Performance</a>
+      <a class="nav-btn" id="nav-reviews" href="#/reviews">Reviews <span class="count" id="nav-count" style="display:none"></span></a>
+    </div>
+    <div class="topbar-right">
+      <span id="mode-pill" class="pill" style="display:none"></span>
+      <select id="range" class="select" onchange="setRange(this.value)" aria-label="Date range">
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <span class="user" id="user-display"></span>
+      <button class="btn ghost" onclick="signOut()">Sign out</button>
+    </div>
+  </header>
+  <main id="view"><div class="loading">Loading…</div></main>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, doc, setDoc, query, orderBy, onSnapshot, serverTimestamp, getDocs, where, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// Same Firebase project as deals.011telecom.com — one login for both sites.
+// Marketing data lives in its own `mkt_*` collections (see CLAUDE.md).
+const firebaseConfig = {
+  apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
+  authDomain: "telecom-deals-f155b.firebaseapp.com",
+  projectId: "telecom-deals-f155b",
+  storageBucket: "telecom-deals-f155b.firebasestorage.app",
+  messagingSenderId: "182881118188",
+  appId: "1:182881118188:web:9d2f09995f7a1393f942c9"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const ALLOWED = ['@011global.com','@011telecom.com'];
+// Local-only preview: http://localhost:<port>/?preview skips sign-in and runs
+// entirely on sample data, never touching Firestore.
+const LOCAL_PREVIEW = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('preview');
+
+const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k,v) => { try { localStorage.setItem(k,v); } catch {} };
+
+const S = {
+  user: null,
+  mode: 'loading',            // 'loading' | 'sample' | 'live'
+  markets: [], campaigns: [],
+  stats: new Map(),           // campaignId -> Map(date -> row)
+  proposalsBase: [],          // sample proposals (live mode: empty, all come from Firestore)
+  proposalDocs: new Map(),    // Firestore docs: full proposals (live) or decisions only (sample)
+  reviews: [], activityBase: [], activityDocs: [],
+  days: [7,30,90].includes(+lsGet('mkt.days')) ? +lsGet('mkt.days') : 30,
+  reviewMarket: 'all',
+  unsubs: [],
+};
+// Sample-mode decisions go to their own collections so they can never be
+// mistaken for real proposals once live data arrives.
+const cols = () => S.mode === 'live'
+  ? { dec: 'mkt_proposals', act: 'mkt_activity' }
+  : { dec: 'mkt_sampleDecisions', act: 'mkt_sampleActivity' };
+
+// ───────────────────────── Auth ─────────────────────────
+const showAuthMsg = m => { const el = document.getElementById('auth-msg'); el.textContent = m; el.style.display = 'block'; };
+const allowedEmail = e => ALLOWED.some(d => (e || '').toLowerCase().endsWith(d));
+
+window.authSubmit = async function(){
+  const email = document.getElementById('auth-email').value.trim();
+  const pass = document.getElementById('auth-pass').value;
+  if (!email || !pass) { showAuthMsg('Please enter email and password.'); return; }
+  const btn = document.getElementById('auth-btn');
+  btn.textContent = '...'; btn.disabled = true;
+  try { await signInWithEmailAndPassword(auth, email, pass); }
+  catch (e) { showAuthMsg(e.message); }
+  btn.textContent = 'Sign in'; btn.disabled = false;
+};
+window.googleSignIn = async function(){
+  try {
+    const result = await signInWithPopup(auth, new GoogleAuthProvider());
+    if (!allowedEmail(result.user.email)) {
+      await fbSignOut(auth);
+      showAuthMsg('Access is restricted to @011global.com and @011telecom.com email addresses.');
+    }
+  } catch (e) { showAuthMsg(e.message); }
+};
+window.signOut = async function(){
+  S.unsubs.forEach(u => u()); S.unsubs = [];
+  if (LOCAL_PREVIEW) { location.search = ''; return; }
+  await fbSignOut(auth);
+};
+
+function enterApp(user){
+  S.user = user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-display').textContent = user.displayName || user.email;
+  document.getElementById('range').value = String(S.days);
+  loadData();
+}
+
+// Deferred so every const/helper below is initialized before the app starts.
+queueMicrotask(() => {
+  if (LOCAL_PREVIEW) {
+    enterApp({ displayName: 'Local preview', email: 'preview@localhost' });
+    return;
+  }
+  onAuthStateChanged(auth, user => {
+    if (user && allowedEmail(user.email)) enterApp(user);
+    else {
+      S.user = null;
+      document.getElementById('app-screen').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'flex';
+    }
+  });
+});
+
+// ───────────────────────── Data ─────────────────────────
+const toDate = v => v?.toDate ? v.toDate() : v instanceof Date ? v : v ? new Date(v) : null;
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const today0 = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+
+async function loadData(){
+  S.mode = 'loading'; render();
+  let live = false;
+  if (!LOCAL_PREVIEW) {
+    try {
+      const snap = await getDocs(query(collection(db, 'mkt_markets'), limit(100)));
+      if (!snap.empty) { await loadLive(snap); live = true; }
+    } catch (e) { console.warn('Live marketing data unavailable — showing sample data.', e); }
+  }
+  if (!live) loadSample();
+  S.mode = live ? 'live' : 'sample';
+  if (!LOCAL_PREVIEW) listen();
+  render();
+}
+
+async function loadLive(marketSnap){
+  S.markets = marketSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const [campSnap, statSnap, revSnap] = await Promise.all([
+    getDocs(collection(db, 'mkt_campaigns')),
+    getDocs(query(collection(db, 'mkt_dailyStats'), where('date', '>=', iso(addDays(today0(), -181))))),
+    getDocs(query(collection(db, 'mkt_reviews'), orderBy('weekOf', 'desc'), limit(12))),
+  ]);
+  S.campaigns = campSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  indexStats(statSnap.docs.map(d => d.data()));
+  S.reviews = revSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  S.proposalsBase = []; S.activityBase = [];
+}
+
+function listen(){
+  S.unsubs.forEach(u => u()); S.unsubs = [];
+  const c = cols();
+  S.unsubs.push(onSnapshot(collection(db, c.dec), snap => {
+    S.proposalDocs = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }]));
+    render();
+  }, e => console.warn('Proposals listener:', e.message)));
+  S.unsubs.push(onSnapshot(query(collection(db, c.act), orderBy('at', 'desc'), limit(200)), snap => {
+    S.activityDocs = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }));
+    render();
+  }, e => console.warn('Activity listener:', e.message)));
+}
+
+function indexStats(rows){
+  S.stats = new Map();
+  for (const r of rows) {
+    if (!S.stats.has(r.campaignId)) S.stats.set(r.campaignId, new Map());
+    S.stats.get(r.campaignId).set(r.date, r);
+  }
+}
+
+function proposals(){
+  if (S.mode === 'live') return [...S.proposalDocs.values()];
+  return S.proposalsBase.map(p => ({ ...p, ...(S.proposalDocs.get(p.id) || {}), id: p.id }));
+}
+function activity(){
+  return [...S.activityDocs, ...S.activityBase].sort((a,b) => (toDate(b.at) || 0) - (toDate(a.at) || 0));
+}
+
+// ─────────────────────── Metrics ───────────────────────
+function period(offset){
+  const end = addDays(today0(), -1 - S.days * offset);
+  return { start: iso(addDays(end, -(S.days - 1))), end: iso(end) };
+}
+function datesIn({ start, end }){
+  const out = []; let d = new Date(start + 'T00:00:00');
+  while (iso(d) <= end) { out.push(iso(d)); d = addDays(d, 1); }
+  return out;
+}
+const blank = () => ({ impressions:0, clicks:0, cost:0, conversions:0, signups:0, purchases:0, value:0 });
+function addRow(a, r){ for (const k in a) a[k] += +r[k] || 0; return a; }
+function aggFor(campaignIds, p){
+  const a = blank();
+  for (const id of campaignIds) {
+    const m = S.stats.get(id); if (!m) continue;
+    for (const [date, r] of m) if (date >= p.start && date <= p.end) addRow(a, r);
+  }
+  return a;
+}
+function daily(campaignIds, p){
+  return datesIn(p).map(date => {
+    const a = blank();
+    for (const id of campaignIds) { const r = S.stats.get(id)?.get(date); if (r) addRow(a, r); }
+    return { date, ...a };
+  });
+}
+const M = {
+  cost: a => a.cost, conversions: a => a.conversions, value: a => a.value, clicks: a => a.clicks,
+  cpa: a => a.conversions ? a.cost / a.conversions : NaN,
+  roas: a => a.cost ? a.value / a.cost : NaN,
+  ctr: a => a.impressions ? a.clicks / a.impressions : NaN,
+};
+const fmt = {
+  money: v => isFinite(v) ? '$' + Math.round(v).toLocaleString('en-US') : '—',
+  money2: v => isFinite(v) ? '$' + v.toFixed(2) : '—',
+  int: v => isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—',
+  pct: v => isFinite(v) ? (v * 100).toFixed(2) + '%' : '—',
+  x: v => isFinite(v) ? v.toFixed(2) + '×' : '—',
+};
+const KPIS = [
+  { key:'cost', label:'Spend', f:fmt.money, good:null },
+  { key:'conversions', label:'Conversions', f:fmt.int, good:'up' },
+  { key:'cpa', label:'Cost / conversion', f:fmt.money2, good:'down' },
+  { key:'value', label:'Conversion value', f:fmt.money, good:'up' },
+  { key:'roas', label:'ROAS', f:fmt.x, good:'up' },
+  { key:'ctr', label:'CTR', f:fmt.pct, good:'up' },
+];
+function delta(cur, prev, good){
+  if (!isFinite(cur) || !isFinite(prev) || prev === 0) return '<span class="delta">—</span>';
+  const d = (cur - prev) / prev, up = d >= 0;
+  let cls = '';
+  if (good && Math.abs(d) >= 0.005) cls = (good === 'up') === up ? 'good' : 'bad';
+  return `<span class="delta ${cls}">${up ? '▲' : '▼'} ${Math.abs(d * 100).toFixed(1)}%</span>`;
+}
+const campaignsOf = marketId => S.campaigns.filter(c => c.marketId === marketId);
+const idsOf = cs => cs.map(c => c.id);
+const marketById = id => S.markets.find(m => m.id === id);
+const campaignById = id => S.campaigns.find(c => c.id === id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const flags = m => `<span class="flags" title="${esc(m.origin)} → ${esc(m.host)}">${m.flags?.[0] || ''}<span class="arrow">→</span>${m.flags?.[1] || ''}</span>`;
+const dShort = s => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
+const dTime = d => d ? d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '';
+function ago(d){
+  if (!d) return '';
+  const h = (Date.now() - d.getTime()) / 36e5;
+  if (h < 1) return 'just now';
+  if (h < 24) return Math.round(h) + 'h ago';
+  return Math.round(h / 24) + 'd ago';
+}
+
+// ─────────────────────── Charts ───────────────────────
+// Round axis steps (1/2/5 × 10^k), at most 5 intervals above zero.
+function niceScale(v){
+  if (!(v > 0)) return { max: 1, step: .25 };
+  for (let k = Math.floor(Math.log10(v)) - 1; ; k++)
+    for (const b of [1, 2, 5]) { const step = b * 10 ** k; if (Math.ceil(v / step) <= 5) return { max: Math.ceil(v / step) * step, step }; }
+}
+// Single-series line chart with crosshair + tooltip. One measure per chart —
+// spend and conversions get separate charts rather than a dual axis.
+function lineChart(el, points, f){
+  const W = Math.max(280, el.clientWidth), H = 200, P = { t:12, r:14, b:26, l:54 };
+  const n = points.length, { max, step: tick } = niceScale(Math.max(...points.map(p => p.v)) * 1.02);
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const x = i => P.l + (n > 1 ? i * iw / (n - 1) : iw / 2);
+  const y = v => P.t + ih * (1 - v / max);
+  const ticks = Array.from({ length: Math.round(max / tick) + 1 }, (_, i) => i * tick);
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
+  const area = `${line}L${x(n - 1).toFixed(1)},${y(0)}L${x(0).toFixed(1)},${y(0)}Z`;
+  const xl = []; const step = Math.max(1, Math.ceil(n / 6));
+  for (let i = 0; i < n; i += step) xl.push(i);
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img">
+    <g class="grid">${ticks.map(t => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}"/>`).join('')}</g>
+    <g class="axis">${ticks.map(t => `<text x="${P.l - 8}" y="${y(t) + 4}" text-anchor="end">${f(t)}</text>`).join('')}
+      ${xl.map(i => `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${dShort(points[i].date)}</text>`).join('')}</g>
+    <path class="area" d="${area}"/><path class="line" d="${line}"/>
+    <line class="xh" y1="${P.t}" y2="${P.t + ih}" style="display:none"/>
+    <circle class="dot" r="5" style="display:none"/>
+    <rect class="hit" x="${P.l}" y="0" width="${iw}" height="${H}" fill="transparent"/>
+  </svg><div class="tip"></div>`;
+  const svg = el.querySelector('svg'), xh = el.querySelector('.xh'), dot = el.querySelector('.dot'), tip = el.querySelector('.tip');
+  const hit = el.querySelector('.hit');
+  hit.addEventListener('pointermove', e => {
+    const px = e.clientX - svg.getBoundingClientRect().left;
+    const i = Math.max(0, Math.min(n - 1, Math.round((px - P.l) / (n > 1 ? iw / (n - 1) : 1))));
+    const p = points[i], cx = x(i), cy = y(p.v);
+    xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.style.display = '';
+    dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.style.display = '';
+    tip.innerHTML = `<b>${f(p.v)}</b>${new Date(p.date + 'T00:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })}`;
+    tip.style.left = Math.min(Math.max(cx, 60), W - 60) + 'px'; tip.style.top = cy + 'px'; tip.style.display = 'block';
+  });
+  hit.addEventListener('pointerleave', () => { xh.style.display = dot.style.display = tip.style.display = 'none'; });
+}
+function sparkline(values){
+  const W = 280, H = 36, max = Math.max(...values, 1), n = values.length;
+  const pts = values.map((v, i) => `${(i * W / Math.max(1, n - 1)).toFixed(1)},${(H - 3 - (v / max) * (H - 6)).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="var(--orange)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+}
+
+// ─────────────────────── Views ───────────────────────
+function kpiRow(A, B){
+  return `<div class="kpis">${KPIS.map(k => `<div class="card kpi"><div class="lbl">${k.label}</div>
+    <div class="val">${k.f(M[k.key](A))}</div>${delta(M[k.key](A), M[k.key](B), k.good)} <span class="delta vs">vs prior ${S.days}d</span></div>`).join('')}</div>`;
+}
+const pendingFor = marketId => proposals().filter(p => p.status === 'pending' && (!marketId || p.marketId === marketId));
+
+function viewPerformance(){
+  const cur = period(0), prev = period(1);
+  const all = idsOf(S.campaigns);
+  const A = aggFor(all, cur), B = aggFor(all, prev);
+  const rows = S.markets.map(m => {
+    const ids = idsOf(campaignsOf(m.id));
+    return { m, ids, a: aggFor(ids, cur), b: aggFor(ids, prev) };
+  }).sort((x, y) => y.a.cost - x.a.cost);
+  const maxCost = Math.max(...rows.map(r => r.a.cost), 1);
+  if (!S.markets.length) return `<div class="empty">No markets yet.</div>`;
+  return `
+  <div class="page-head"><div><h1>Performance by market</h1>
+    <div class="sub">${dShort(cur.start)} – ${dShort(cur.end)} · all Google Ads campaigns, grouped by diaspora corridor</div></div></div>
+  ${kpiRow(A, B)}
+  <h2 class="sec">Markets</h2>
+  <div class="markets">${rows.map(({ m, ids, a, b }) => {
+    const active = campaignsOf(m.id).filter(c => c.status === 'ENABLED').length;
+    const pend = pendingFor(m.id).length;
+    const series = daily(ids, cur).map(d => d.conversions);
+    return `<a class="mcard" href="#/market/${esc(m.id)}">
+      <div class="mhead">${flags(m)}<div><div class="mname">${esc(m.name)}</div>
+        <div class="msub">${active} active campaign${active === 1 ? '' : 's'} · ${esc((m.cities || []).join(', '))}</div></div>
+        ${pend ? `<span class="pending">${pend} to review</span>` : ''}</div>
+      <div class="mstats">
+        <div class="mstat"><div class="l">Spend</div><div class="v">${fmt.money(a.cost)}</div>${delta(a.cost, b.cost, null)}</div>
+        <div class="mstat"><div class="l">Conv.</div><div class="v">${fmt.int(a.conversions)}</div>${delta(a.conversions, b.conversions, 'up')}</div>
+        <div class="mstat"><div class="l">CPA</div><div class="v">${fmt.money2(M.cpa(a))}</div>${delta(M.cpa(a), M.cpa(b), 'down')}</div>
+        <div class="mstat"><div class="l">ROAS</div><div class="v">${fmt.x(M.roas(a))}</div>${delta(M.roas(a), M.roas(b), 'up')}</div>
+      </div>
+      <div class="spark"><div class="l"><span>Daily conversions</span><span>${dShort(cur.start)} – ${dShort(cur.end)}</span></div>${sparkline(series)}</div>
+    </a>`;
+  }).join('')}</div>
+  <h2 class="sec">Compare markets</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Market</th><th>Spend</th><th>Clicks</th><th>CTR</th><th>Conversions</th><th>Cost / conv.</th><th>Conv. value</th><th>ROAS</th><th>Conv. change</th></tr></thead>
+    <tbody>${rows.map(({ m, a, b }) => `<tr class="link" onclick="location.hash='#/market/${esc(m.id)}'">
+      <td>${flags(m)} &nbsp;${esc(m.name)}</td>
+      <td><div class="bar">${fmt.money(a.cost)}<span class="track"><i style="width:${(a.cost / maxCost * 100).toFixed(1)}%"></i></span></div></td>
+      <td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td><td>${fmt.int(a.conversions)}</td>
+      <td>${fmt.money2(M.cpa(a))}</td><td>${fmt.money(a.value)}</td><td>${fmt.x(M.roas(a))}</td>
+      <td>${delta(a.conversions, b.conversions, 'up')}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function viewMarket(id){
+  const m = marketById(id);
+  if (!m) return `<a class="crumb" href="#/performance">← All markets</a><div class="empty">Market not found.</div>`;
+  const cur = period(0), prev = period(1);
+  const cs = campaignsOf(id), ids = idsOf(cs);
+  const A = aggFor(ids, cur), B = aggFor(ids, prev);
+  const pend = pendingFor(id);
+  const campRows = cs.map(c => ({ c, a: aggFor([c.id], cur) })).sort((x, y) => y.a.cost - x.a.cost);
+  return `
+  <a class="crumb" href="#/performance">← All markets</a>
+  <div class="page-head"><div style="display:flex;gap:12px;align-items:center">${flags(m).replace('class="flags"', 'class="flags" style="font-size:30px"')}
+    <div><h1>${esc(m.name)}</h1><div class="sub">${esc((m.cities || []).join(' · '))}${m.language ? ' · ads in ' + esc(m.language) : ''} · ${dShort(cur.start)} – ${dShort(cur.end)}</div></div></div></div>
+  ${kpiRow(A, B)}
+  <div class="charts" style="margin-top:12px">
+    <div class="card chart-card"><h3>Daily spend</h3><div class="csub">All campaigns in this market</div><div class="chart" data-chart="cost"></div></div>
+    <div class="card chart-card"><h3>Daily conversions</h3><div class="csub">Sign-ups + purchases</div><div class="chart" data-chart="conversions"></div></div>
+  </div>
+  <h2 class="sec">Conversions by action</h2>
+  <div class="split">
+    ${[['signups','Sign-ups'],['purchases','Purchases']].map(([k, l]) => `<div class="card kpi"><div class="lbl">${l}</div>
+      <div class="val">${fmt.int(A[k])}</div>${delta(A[k], B[k], 'up')} <span class="delta vs">· ${A[k] ? fmt.money2(A.cost / A[k]) + ' each' : '—'}</span></div>`).join('')}
+    <div class="card kpi"><div class="lbl">Sign-up → purchase</div><div class="val">${A.conversions ? fmt.pct(A.purchases / A.conversions).replace(/\.\d+%/, '%') : '—'}</div><span class="delta vs">share of conversions that are purchases</span></div>
+  </div>
+  <h2 class="sec">Campaigns</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Campaign</th><th>Type</th><th>Status</th><th>Budget / day</th><th>Spend</th><th>Clicks</th><th>CTR</th><th>Conv.</th><th>Cost / conv.</th><th>ROAS</th></tr></thead>
+    <tbody>${campRows.map(({ c, a }) => `<tr>
+      <td>${esc(c.name)}</td><td>${esc(c.type)}</td>
+      <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
+      <td>${fmt.money(c.dailyBudget)}</td><td>${fmt.money(a.cost)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
+      <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a))}</td><td>${fmt.x(M.roas(a))}</td></tr>`).join('')}</tbody>
+  </table></div>
+  <h2 class="sec">Waiting for review</h2>
+  ${pend.length ? `<div class="mini-props">${pend.map(p => `<a class="mini-prop" href="#/reviews/pending/${esc(p.marketId)}">
+      <span class="tag type">${esc(TYPE_LABEL[p.type] || p.type)}</span>${esc(p.title)}<span class="go">Review →</span></a>`).join('')}</div>`
+    : `<div class="card empty" style="padding:1.25rem">Nothing waiting for review in this market.</div>`}`;
+}
+function drawMarketCharts(id){
+  const pts = daily(idsOf(campaignsOf(id)), period(0));
+  document.querySelectorAll('[data-chart]').forEach(el => {
+    const k = el.dataset.chart;
+    lineChart(el, pts.map(p => ({ date: p.date, v: p[k] })), k === 'cost' ? fmt.money : fmt.int);
+  });
+}
+
+const TYPE_LABEL = {
+  budget_increase:'Budget increase', budget_decrease:'Budget decrease', pause_campaign:'Pause campaign',
+  add_keywords:'Add keywords', add_negative_keywords:'Negative keywords', new_creatives:'New creatives', bid_strategy:'Bid strategy',
+};
+const LEVEL = { approval: ['approval', 'Needs approval'], auto_limit: ['auto', 'Auto within limits'] };
+
+function evidence(p){
+  const c = campaignById(p.campaignId); if (!c) return '';
+  const p30 = { start: iso(addDays(today0(), -30)), end: iso(addDays(today0(), -1)) };
+  const a = aggFor([c.id], p30), mk = aggFor(idsOf(campaignsOf(p.marketId)), p30);
+  return `<div class="evidence">
+    <span>Spend 30d <b>${fmt.money(a.cost)}</b></span>
+    <span>Conv. 30d <b>${fmt.int(a.conversions)}</b></span>
+    <span>Campaign CPA <b>${fmt.money2(M.cpa(a))}</b></span>
+    <span>Market CPA <b>${fmt.money2(M.cpa(mk))}</b></span>
+    <span>CTR <b>${fmt.pct(M.ctr(a))}</b></span></div>`;
+}
+function creativeSvg(c, i){
+  const words = c.headline.split(' '), lines = [''];
+  for (const w of words) { if ((lines[lines.length - 1] + ' ' + w).trim().length > 20) lines.push(w); else lines[lines.length - 1] = (lines[lines.length - 1] + ' ' + w).trim(); }
+  const dots = [[7,7],[19,7],[31,7],[7,19],[19,19],[31,19],[45,19],[7,31],[19,31],[31,31]];
+  return `<svg viewBox="0 0 382 200" role="img" aria-label="${esc(c.headline)}">
+    <rect width="382" height="200" fill="${c.bg}"/>
+    <g transform="translate(22,20) scale(.55)">${dots.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="${c.accent}"/>`).join('')}</g>
+    ${lines.map((l, j) => `<text x="22" y="${78 + j * 30}" font-size="25" font-weight="800" fill="${c.fg}" font-family="-apple-system,Segoe UI,sans-serif" ${c.rtl ? 'direction="rtl" unicode-bidi="plaintext"' : ''}>${esc(l)}</text>`).join('')}
+    <text x="22" y="${88 + lines.length * 30}" font-size="13" fill="${c.fg}" opacity=".8" font-family="-apple-system,Segoe UI,sans-serif">${esc(c.sub)}</text>
+    <rect x="262" y="150" width="98" height="30" rx="15" fill="${c.accent}"/>
+    <text x="311" y="170" font-size="12.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif">${esc(c.cta)}</text>
+  </svg>`;
+}
+
+function proposalCard(p){
+  const m = marketById(p.marketId), c = campaignById(p.campaignId);
+  const [lvCls, lvLbl] = LEVEL[p.level] || ['approval', 'Needs approval'];
+  const created = toDate(p.createdAt);
+  const decided = p.status !== 'pending';
+  const autoAt = p.level === 'auto_limit' && created ? addDays(created, 1) : null;
+  return `<article class="prop">
+    <div class="prop-top">
+      <span class="tag type">${esc(TYPE_LABEL[p.type] || p.type)}</span>
+      <span class="tag ${lvCls}">${lvLbl}</span>
+      ${decided ? `<span class="tag ${esc(p.status)}">${esc(p.status[0].toUpperCase() + p.status.slice(1))}</span>` : ''}
+      <span class="when" title="${esc(dTime(created))}">${esc(p.source || '')} · ${ago(created)}</span>
+    </div>
+    <h3>${esc(p.title)}</h3>
+    <div class="camp">${m ? flags(m) + ' ' + esc(m.name) : ''}${c ? ' · ' + esc(c.name) : ''}</div>
+    ${p.change ? `<div class="change">${esc(p.change.label)}: <span class="from">${esc(p.change.from)}</span> → <span class="to">${esc(p.change.to)}</span></div>` : ''}
+    <p class="why">${esc(p.rationale)}</p>
+    ${evidence(p)}
+    ${p.keywords?.length ? `<div class="kw">${p.keywords.map(k => `<code>${esc(k)}</code>`).join('')}</div>` : ''}
+    ${p.creatives?.length ? `<div class="creatives">${p.creatives.map((cr, i) => `<figure>${creativeSvg(cr, i)}<figcaption>Variant ${String.fromCharCode(65 + i)} · ${esc(cr.note || '1.91:1 image')}</figcaption></figure>`).join('')}</div>` : ''}
+    ${p.impact ? `<div class="impact">Expected: ${esc(p.impact)}</div>` : ''}
+    ${!decided && autoAt ? `<div class="autonote">Applies automatically ${esc(dTime(autoAt))} unless rejected — within the ±15% auto limit.</div>` : ''}
+    ${decided
+      ? `<div class="decided">${esc(p.status === 'rejected' ? 'Rejected' : 'Approved')} by ${esc(p.decidedBy || '—')} · ${esc(dTime(toDate(p.decidedAt)))}
+          ${p.decisionNote ? `<q>${esc(p.decisionNote)}</q>` : ''}
+          <button class="btn ghost" onclick="decide('${esc(p.id)}','pending')">Reopen</button></div>`
+      : `<div class="prop-actions">
+          <input id="note-${esc(p.id)}" placeholder="Optional note (why, or what to change)" aria-label="Note">
+          <button class="btn reject" onclick="decide('${esc(p.id)}','rejected')">Reject</button>
+          <button class="btn approve" onclick="decide('${esc(p.id)}','approved')">${p.level === 'auto_limit' ? 'Apply now' : 'Approve'}</button>
+        </div>`}
+  </article>`;
+}
+
+function viewReviews(tab, marketFilter){
+  if (marketFilter) S.reviewMarket = marketFilter;
+  const mf = S.reviewMarket;
+  const inMarket = p => mf === 'all' || p.marketId === mf;
+  const all = proposals();
+  const pending = all.filter(p => p.status === 'pending').sort((a, b) => (toDate(b.createdAt) || 0) - (toDate(a.createdAt) || 0));
+  const history = all.filter(p => p.status !== 'pending').sort((a, b) => (toDate(b.decidedAt) || 0) - (toDate(a.decidedAt) || 0));
+  const tabs = [['pending', 'To review', pending.length], ['history', 'Decided', 0], ['weekly', 'Weekly reviews', 0], ['activity', 'Activity log', 0]];
+  const filterBar = `<div class="filters">Market
+    <select class="select" onchange="setReviewMarket(this.value)">
+      <option value="all">All markets</option>
+      ${S.markets.map(m => `<option value="${esc(m.id)}" ${mf === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}
+    </select></div>`;
+  let body = '';
+  if (tab === 'pending') {
+    const list = pending.filter(inMarket);
+    body = filterBar + (list.length ? `<div class="props">${list.map(proposalCard).join('')}</div>` : `<div class="card empty">All caught up — nothing waiting for review.</div>`);
+  } else if (tab === 'history') {
+    const list = history.filter(inMarket);
+    body = filterBar + (list.length ? `<div class="props">${list.map(proposalCard).join('')}</div>` : `<div class="card empty">No decisions yet.</div>`);
+  } else if (tab === 'weekly') {
+    body = S.reviews.length ? `<div class="props">${S.reviews.map(r => `<article class="card review">
+      <h3>Week of ${esc(dShort(r.weekOf))}</h3><div class="meta">${esc(r.author || 'Weekly review')}</div>
+      <p>${esc(r.summary)}</p>
+      <div class="cols">
+        <div><h4>Working</h4><ul>${(r.highlights || []).map(h => `<li>${esc(h)}</li>`).join('')}</ul></div>
+        <div><h4>Watch</h4><ul>${(r.concerns || []).map(h => `<li>${esc(h)}</li>`).join('')}</ul></div>
+      </div></article>`).join('')}</div>` : `<div class="card empty">No weekly reviews yet. The first one runs Monday at 8am.</div>`;
+  } else {
+    const list = activity().filter(a => mf === 'all' || !a.marketId || a.marketId === mf);
+    body = filterBar + (list.length ? `<div class="card"><ul class="log">${list.map(a => {
+      const m = marketById(a.marketId);
+      return `<li><span class="t">${esc(dTime(toDate(a.at)))}</span><span class="who">${esc(a.actor)}</span><span>${m ? flags(m) + ' ' : ''}${esc(a.text)}</span></li>`;
+    }).join('')}</ul></div>` : `<div class="card empty">No activity yet.</div>`);
+  }
+  return `<div class="page-head"><div><h1>Reviews & suggestions</h1>
+      <div class="sub">Changes proposed by the daily rule checks and the weekly review. Nothing that needs approval goes live until you approve it.</div></div></div>
+    <nav class="tabs">${tabs.map(([k, l, n]) => `<a class="tab ${tab === k ? 'active' : ''}" href="#/reviews/${k}">${l}${n ? ` <span class="count">${n}</span>` : ''}</a>`).join('')}</nav>
+    ${body}`;
+}
+
+// ─────────────────────── Actions ───────────────────────
+window.setRange = v => { S.days = +v; lsSet('mkt.days', v); render(); };
+window.setReviewMarket = v => { S.reviewMarket = v; render(); };
+window.decide = async function(id, status){
+  const p = proposals().find(x => x.id === id); if (!p) return;
+  const note = status === 'pending' ? '' : (document.getElementById('note-' + id)?.value || '').trim();
+  const by = S.user.displayName || S.user.email;
+  const verb = { approved: 'Approved', rejected: 'Rejected', pending: 'Reopened' }[status];
+  const text = `${verb}: ${p.title}${note ? ` — “${note}”` : ''}`;
+  if (LOCAL_PREVIEW) {
+    S.proposalDocs.set(id, { ...(S.proposalDocs.get(id) || {}), status, decidedBy: by, decidedAt: new Date(), decisionNote: note });
+    S.activityDocs.unshift({ at: new Date(), actor: by, text, marketId: p.marketId });
+    render(); toast(`${verb} (local preview — not saved)`); return;
+  }
+  try {
+    await setDoc(doc(db, cols().dec, id), { status, decidedBy: by, decidedByEmail: S.user.email, decidedAt: serverTimestamp(), decisionNote: note }, { merge: true });
+    await addDoc(collection(db, cols().act), { at: serverTimestamp(), actor: by, kind: 'decision', text, marketId: p.marketId, proposalId: id });
+    toast(status === 'approved' && S.mode === 'sample' ? 'Approved — saved (sample data, nothing sent to Google Ads)' : verb);
+  } catch (e) { toast('Could not save: ' + e.message, 'error'); }
+};
+let toastT;
+function toast(msg, kind){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = kind || ''; el.style.display = 'block';
+  clearTimeout(toastT); toastT = setTimeout(() => el.style.display = 'none', 3500);
+}
+
+// ─────────────────────── Router ───────────────────────
+function render(){
+  const view = document.getElementById('view');
+  if (S.mode === 'loading') { view.innerHTML = '<div class="loading">Loading…</div>'; return; }
+  const pill = document.getElementById('mode-pill');
+  pill.style.display = '';
+  pill.className = 'pill' + (S.mode === 'live' ? ' live' : '');
+  pill.textContent = S.mode === 'live' ? 'Live' : 'Sample data';
+  pill.title = S.mode === 'live' ? 'Synced from Google Ads' : 'Google Ads is not connected yet — numbers are generated sample data';
+  const n = pendingFor().length, cnt = document.getElementById('nav-count');
+  cnt.textContent = n; cnt.style.display = n ? '' : 'none';
+
+  const [, section = 'performance', a, b] = (location.hash || '#/performance').split('/');
+  document.getElementById('nav-performance').classList.toggle('active', section !== 'reviews');
+  document.getElementById('nav-reviews').classList.toggle('active', section === 'reviews');
+  const y = window.scrollY, same = render.last === location.hash;
+  if (section === 'market') { view.innerHTML = viewMarket(a); drawMarketCharts(a); }
+  else if (section === 'reviews') view.innerHTML = viewReviews(a || 'pending', b);
+  else view.innerHTML = viewPerformance();
+  window.scrollTo(0, same ? y : 0);
+  render.last = location.hash;
+}
+window.addEventListener('hashchange', render);
+let resizeT;
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (location.hash.startsWith('#/market/')) drawMarketCharts(location.hash.split('/')[2]); }, 150); });
+
+// ─────────────────────── Sample data ───────────────────────
+// Stand-in until the backend syncs real Google Ads data into the mkt_*
+// collections. Deterministic (seeded) so numbers don't jump between reloads.
+function mulberry32(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function loadSample(){
+  const rnd = mulberry32(11);
+  S.markets = [
+    { id:'br-us', name:'Brazilians in USA', origin:'BR', host:'US', flags:['🇧🇷','🇺🇸'], cities:['Boston','Orlando','Newark'], language:'Portuguese' },
+    { id:'br-pt', name:'Brazilians in Portugal', origin:'BR', host:'PT', flags:['🇧🇷','🇵🇹'], cities:['Lisbon','Porto','Braga'], language:'Portuguese' },
+    { id:'il-us', name:'Israelis in USA', origin:'IL', host:'US', flags:['🇮🇱','🇺🇸'], cities:['New York','Los Angeles','Miami'], language:'Hebrew & English' },
+    { id:'gb-es', name:'British in Spain', origin:'GB', host:'ES', flags:['🇬🇧','🇪🇸'], cities:['Alicante','Málaga','Mallorca'], language:'English' },
+    { id:'us-mx', name:'Americans in Mexico', origin:'US', host:'MX', flags:['🇺🇸','🇲🇽'], cities:['San Miguel de Allende','Lake Chapala','Mexico City'], language:'English' },
+    { id:'ca-us', name:'Canadians in USA', origin:'CA', host:'US', flags:['🇨🇦','🇺🇸'], cities:['Florida','Arizona','California'], language:'English' },
+  ];
+  const tune = { 'br-us':{ scale:1.6, cvr:1.25, trend:.25 }, 'br-pt':{ scale:.9, cvr:1.05, trend:.1 }, 'il-us':{ scale:1.1, cvr:1, trend:-.05 },
+                 'gb-es':{ scale:.7, cvr:.95, trend:.15 }, 'us-mx':{ scale:.6, cvr:.9, trend:0 }, 'ca-us':{ scale:.8, cvr:.55, trend:-.2 } };
+  const profile = { 'Search':{ impr:2200, ctr:.055, cpc:1.10, cvr:.085 }, 'Performance Max':{ impr:9000, ctr:.012, cpc:.70, cvr:.06 },
+                    'Display':{ impr:14000, ctr:.005, cpc:.35, cvr:.025 }, 'YouTube':{ impr:11000, ctr:.004, cpc:.30, cvr:.02 } };
+  const short = { 'br-us':'BR→US', 'br-pt':'BR→PT', 'il-us':'IL→US', 'gb-es':'UK→ES', 'us-mx':'US→MX', 'ca-us':'CA→US' };
+  const defs = [
+    ['br-us','Search','Ligações para o Brasil'], ['br-us','Performance Max','Recarga'], ['br-us','Display','Remarketing'],
+    ['br-pt','Search','Chamadas para o Brasil'], ['br-pt','Performance Max','Recarga'],
+    ['il-us','Search','Call Israel'], ['il-us','Performance Max','Stay close'], ['il-us','YouTube','Holidays video'],
+    ['gb-es','Search','Call the UK'], ['gb-es','Display','Expat forums'],
+    ['us-mx','Search','Call home to the US'], ['us-mx','YouTube','Snowbird video'],
+    ['ca-us','Search','Call Canada'], ['ca-us','Display','Snowbirds FL/AZ'], ['ca-us','Performance Max','Winter', 20],
+  ];
+  const DAYS = 182, start = addDays(today0(), -DAYS);
+  const rows = [];
+  S.campaigns = defs.map(([marketId, type, label, pausedDaysAgo]) => {
+    const id = `${marketId}-${type.toLowerCase().replace(/\s+/g, '-')}`;
+    const t = tune[marketId], pr = profile[type];
+    const fatigue = id === 'il-us-performance-max', weak = id === 'ca-us-display' ? .4 : id === 'us-mx-youtube' ? .6 : 1;
+    let recentCost = 0;
+    for (let i = 0; i < DAYS; i++) {
+      if (pausedDaysAgo && i >= DAYS - pausedDaysAgo) break;
+      const d = addDays(start, i), wk = [0, 6].includes(d.getDay()) ? 1.12 : 1;
+      const mult = t.scale * (1 + t.trend * (i / DAYS - .5)) * wk * (.85 + rnd() * .3);
+      const impressions = Math.round(pr.impr * mult);
+      const clicks = Math.round(impressions * pr.ctr * (fatigue ? 1.15 - .45 * i / DAYS : 1) * (.9 + rnd() * .2));
+      const cost = +(clicks * pr.cpc * (.9 + rnd() * .2)).toFixed(2);
+      const conversions = Math.floor(clicks * pr.cvr * t.cvr * weak * (.8 + rnd() * .4) + rnd());
+      const purchases = Math.min(conversions, Math.floor(conversions * (.35 + rnd() * .1) + rnd()));
+      const value = +(purchases * (28 + rnd() * 20)).toFixed(2);
+      rows.push({ campaignId:id, marketId, date: iso(d), impressions, clicks, cost, conversions, signups: conversions - purchases, purchases, value });
+      if (i >= DAYS - 14) recentCost += cost;
+    }
+    return { id, marketId, type, name: `${short[marketId]} · ${type} · ${label}`,
+             status: pausedDaysAgo ? 'PAUSED' : 'ENABLED',
+             dailyBudget: recentCost / 14 > 40 ? Math.round(recentCost / 14 * 1.04 / 5) * 5 : Math.max(5, Math.round(recentCost / 14 * 1.04)) };
+  });
+  indexStats(rows);
+
+  const budget = id => S.campaigns.find(c => c.id === id).dailyBudget;
+  const hrs = h => new Date(Date.now() - h * 36e5);
+  const round5 = v => Math.round(v / 5) * 5;
+  const brSearch = budget('br-us-search'), mxYt = budget('us-mx-youtube');
+  S.proposalsBase = [
+    { id:'p-101', marketId:'br-us', campaignId:'br-us-search', type:'budget_increase', level:'approval', source:'Weekly review', createdAt:hrs(5), status:'pending',
+      title:'Raise daily budget on BR→US Search',
+      change:{ label:'Daily budget', from:fmt.money(brSearch), to:fmt.money(round5(brSearch * 1.35)) },
+      rationale:'This campaign runs out of budget by early afternoon on most days and is losing about a third of eligible impressions to budget. Its cost per conversion is the lowest in the account and has held steady while volume grew, so extra budget should buy more of the same conversions rather than weaker ones.',
+      impact:'+20–30% conversions in this market at a similar cost per conversion' },
+    { id:'p-102', marketId:'ca-us', campaignId:'ca-us-display', type:'pause_campaign', level:'approval', source:'Daily rules', createdAt:hrs(9), status:'pending',
+      title:'Pause CA→US Display (Snowbirds FL/AZ)',
+      change:{ label:'Status', from:'Active', to:'Paused' },
+      rationale:'Cost per conversion is more than double the market average and has not improved in 30 days. Almost no purchases come from this campaign; the few conversions are sign-ups that rarely convert. Pausing frees the budget for CA→US Search, which converts far better.',
+      impact:'Saves the full Display budget; little expected loss in purchases' },
+    { id:'p-103', marketId:'il-us', campaignId:'il-us-performance-max', type:'new_creatives', level:'approval', source:'Weekly review', createdAt:hrs(26), status:'pending',
+      title:'Refresh images for IL→US Performance Max',
+      rationale:'Click-through rate on this campaign has dropped steadily for about two months while impressions stayed flat — the classic sign of creative fatigue. The image tool generated three new variants from the brand kit. Approving adds them to the asset group alongside the current images; the weakest current asset is removed after 14 days if the new ones win.',
+      creatives:[
+        { headline:'Call Israel like you never left', sub:'Crystal-clear calls to family, any time', cta:'Start now', bg:'#1A1A1A', fg:'#FFFFFF', accent:'#F47B20', note:'Dark, brand orange' },
+        { headline:'Shabbat dinner calls, sorted', sub:'Low rates to Israeli mobiles and landlines', cta:'See rates', bg:'#FEF0E4', fg:'#1A1A1A', accent:'#F47B20', note:'Light, warm' },
+        { headline:'קרוב לבית, תמיד', sub:'Unlimited calling to Israel from the US', cta:'Try it', bg:'#F47B20', fg:'#FFFFFF', accent:'#1A1A1A', note:'Hebrew headline', rtl:true },
+      ],
+      impact:'Recover CTR toward its level two months ago' },
+    { id:'p-104', marketId:'gb-es', campaignId:'gb-es-search', type:'add_keywords', level:'approval', source:'Weekly review', createdAt:hrs(28), status:'pending',
+      title:'Add 6 keywords to UK→ES Search',
+      rationale:'Search terms report shows these queries already triggering ads through broad match with good conversion rates. Adding them as phrase match gives them their own bids and ad copy.',
+      keywords:['"call uk landline from spain"','"cheap calls to england"','"uk mobile calls from spain"','"call nhs from abroad"','"international calls spain to uk"','"expat phone plan spain"'],
+      impact:'+8–12 conversions / month' },
+    { id:'p-105', marketId:'us-mx', campaignId:'us-mx-youtube', type:'budget_decrease', level:'auto_limit', source:'Daily rules', createdAt:hrs(3), status:'pending',
+      title:'Trim US→MX YouTube budget by 15%',
+      change:{ label:'Daily budget', from:fmt.money(mxYt), to:fmt.money(Math.round(mxYt * .85)) },
+      rationale:'Views are cheap, but this campaign costs more per conversion than the rest of the market and brings few purchases. This is within the ±15% automatic limit, so it applies on its own unless you reject it.' },
+    { id:'p-106', marketId:'ca-us', campaignId:'ca-us-search', type:'bid_strategy', level:'approval', source:'Weekly review', createdAt:hrs(30), status:'pending',
+      title:'Switch CA→US Search to Target CPA bidding',
+      change:{ label:'Bid strategy', from:'Maximize clicks', to:'Target CPA' },
+      rationale:'The campaign now has enough conversion history (30+ in the last 30 days) for Google to bid toward cost per conversion instead of clicks. Maximize clicks is buying cheap traffic that does not convert.',
+      impact:'Lower cost per conversion after a 1–2 week learning period' },
+    { id:'p-090', marketId:'br-us', campaignId:'br-us-performance-max', type:'budget_increase', level:'approval', source:'Weekly review', createdAt:hrs(24 * 8), status:'approved',
+      decidedBy:'Sample reviewer', decidedAt:hrs(24 * 7.8), decisionNote:'',
+      title:'Raise daily budget on BR→US Performance Max',
+      change:{ label:'Daily budget', from:'$55', to:'$65' },
+      rationale:'Budget-limited with a cost per conversion below the market average.', impact:'+10–15% conversions' },
+    { id:'p-091', marketId:'il-us', campaignId:'il-us-youtube', type:'pause_campaign', level:'approval', source:'Daily rules', createdAt:hrs(24 * 9), status:'rejected',
+      decidedBy:'Sample reviewer', decidedAt:hrs(24 * 8.5), decisionNote:'Keep running through the holiday season, revisit in October.',
+      title:'Pause IL→US YouTube (Holidays video)',
+      change:{ label:'Status', from:'Active', to:'Paused' },
+      rationale:'Low conversion rate compared with Search and Performance Max in this market.' },
+  ];
+
+  const monday = d => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+  const w0 = monday(today0()), w1 = addDays(w0, -7);
+  S.reviews = [
+    { id:'w0', weekOf: iso(w0), author:'Claude · weekly review (sample)',
+      summary:'Brazilians in USA keeps carrying the account: it has the most conversions and the lowest cost per conversion, and its Search campaign is held back by budget. Canadians in USA is the weak spot — Display spend there is producing sign-ups that almost never turn into purchases. Israeli creatives are wearing out.',
+      highlights:['BR→US Search: best cost per conversion in the account, still budget-limited', 'UK→ES: steady growth; several converting search terms are ready to become keywords', 'BR→PT: stable, no action needed'],
+      concerns:['CA→US Display: cost per conversion more than 2× market average — proposed pause', 'IL→US Performance Max: CTR sliding for ~8 weeks — new images proposed', 'US→MX YouTube: cheap views, very few sign-ups'] },
+    { id:'w1', weekOf: iso(w1), author:'Claude · weekly review (sample)',
+      summary:'Quiet week. Approved budget increase on BR→US Performance Max is spending fully without raising cost per conversion. Holiday video in IL→US kept running per your note.',
+      highlights:['BR→US Performance Max absorbed the extra budget at a similar cost per conversion'],
+      concerns:['CA→US conversions down week over week — watching one more week before proposing changes'] },
+  ];
+  S.activityBase = [
+    { at: hrs(2), actor:'System', text:'Daily sync from Google Ads completed (sample)' },
+    { at: hrs(3), actor:'Daily rules', marketId:'us-mx', text:'Proposed: trim US→MX YouTube budget by 15% (auto-applies in 24h unless rejected)' },
+    { at: hrs(9), actor:'Daily rules', marketId:'ca-us', text:'Alert: CA→US Display cost per conversion above 2× market average for 30 days' },
+    { at: hrs(26), actor:'Image tool', marketId:'il-us', text:'Generated 3 image variants for IL→US Performance Max' },
+    { at: hrs(30), actor:'Weekly review', text:'Weekly review posted with 4 proposals' },
+    { at: hrs(24 * 3), actor:'Daily rules', marketId:'br-pt', text:'Auto-applied: added 9 negative keywords to BR→PT Search ("grátis", "whatsapp", …)' },
+    { at: hrs(24 * 7.8), actor:'Sample reviewer', marketId:'br-us', text:'Approved: raise daily budget on BR→US Performance Max ($55 → $65)' },
+    { at: hrs(24 * 8.5), actor:'Sample reviewer', marketId:'il-us', text:'Rejected: pause IL→US YouTube — “Keep running through the holiday season”' },
+  ];
+}
+</script>
+</body>
+</html>
