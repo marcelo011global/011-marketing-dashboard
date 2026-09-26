@@ -31,10 +31,9 @@ The script runs under the existing Firebase project `telecom-deals-f155b`.
    `appsscript.json` in the editor with the one in this folder.
 4. **Project Settings → Google Cloud Platform (GCP) Project → Change project** →
    enter the project number from step 2.
-5. **Project Settings → Script properties**:
-   - `DEVELOPER_TOKEN`: the token from step 1
-   - `LOGIN_CUSTOMER_ID`: the manager account ID, digits only
-6. `CONFIG.MARKETS` already has the account IDs: Israel 243-887-6474, Brazil 122-027-9929.
+5. **Project Settings → Script properties**: add `DEVELOPER_TOKEN` with the token from step 1.
+6. The account IDs are already in `CONFIG`: manager 011Global (MCC) 624-832-7649,
+   Israel 243-887-6474, Brazil 122-027-9929.
 
 ## 4. Run it
 1. Run `testConnection` and approve the permissions prompt. The log should show

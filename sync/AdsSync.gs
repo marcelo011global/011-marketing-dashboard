@@ -19,8 +19,8 @@
 var CONFIG = {
   API_VERSION: 'v25',
   DEVELOPER_TOKEN: PropertiesService.getScriptProperties().getProperty('DEVELOPER_TOKEN'),
-  // Manager (MCC) account the developer token belongs to, digits only.
-  LOGIN_CUSTOMER_ID: PropertiesService.getScriptProperties().getProperty('LOGIN_CUSTOMER_ID'),
+  // Manager account "011Global (MCC)" 624-832-7649, which the developer token belongs to.
+  LOGIN_CUSTOMER_ID: '6248327649',
   FIRESTORE: 'projects/telecom-deals-f155b/databases/(default)/documents',
   // Google Ads account per market, digits only (no dashes).
   MARKETS: [
@@ -61,7 +61,7 @@ function testConnection() {
 
 // ───────────────────────── Sync ─────────────────────────
 function syncAll_(days) {
-  if (!CONFIG.DEVELOPER_TOKEN || !CONFIG.LOGIN_CUSTOMER_ID) throw new Error('Set DEVELOPER_TOKEN and LOGIN_CUSTOMER_ID in Project Settings → Script properties.');
+  if (!CONFIG.DEVELOPER_TOKEN || !CONFIG.LOGIN_CUSTOMER_ID) throw new Error('Set DEVELOPER_TOKEN in Project Settings → Script properties.');
   var end = ymd_(addDays_(new Date(), -1));
   var start = ymd_(addDays_(new Date(), -days));
   CONFIG.MARKETS.forEach(function (m) { syncMarket_(m, start, end); });
