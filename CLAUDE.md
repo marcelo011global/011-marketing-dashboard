@@ -1,23 +1,25 @@
-# 011 Telecom — Marketing
+# 011 Global — Marketing
 
 ## Project Overview
-Marketing dashboard for 011 Telecom LLC's Google Ads campaigns, which target
-diaspora calling corridors (e.g. Brazilians in USA, Israelis in USA). Two parts:
+Marketing dashboard for **011 Global**'s Google Ads campaigns, which target
+diaspora calling corridors (e.g. Brazilians in USA, Israelis in USA). Three sections:
 
 1. **Performance** — campaigns and conversions grouped by **market**
    (a market = one diaspora corridor, origin → host country). Overview of all
    markets plus a detail page per market (daily spend/conversions, conversions
    by action, campaign table, pending proposals).
-2. **Reviews** — proposals made by the daily rule checks and the weekly agent
+2. **Campaigns** — spend, clicks and conversions charts for all campaigns, or
+   filtered by market / one campaign / several ticked campaigns combined.
+3. **Reviews** — proposals made by the daily rule checks and the weekly agent
    review (budget changes, pauses, keywords, bid strategy, new creatives), with
    Approve/Reject, decision history, weekly review summaries and an activity log.
 
 Sibling of [011-deals-dashboard](https://github.com/marcelo011global/011-deals-dashboard)
-(deals.011telecom.com) and teligen-crm: same build philosophy (single HTML
-file, vanilla JS, Firebase, GitHub Pages), same brand tokens and logo.
+(deals.011telecom.com, 011 Telecom) and teligen-crm: same build philosophy (single HTML
+file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global (wordmark `011global`).
 
 ## Live URL
-- Production: https://marketing.011telecom.com (GitHub Pages — see Setup below)
+- Production: https://marketing.011global.com (GitHub Pages — see Setup below)
 - Local: serve the folder and open `http://localhost:<port>/?preview` — skips
   sign-in and runs fully on sample data without touching Firestore (localhost only).
 
@@ -64,11 +66,11 @@ git push origin main
 
 ## Setup (one time)
 1. Create GitHub repo `marcelo011global/011-marketing-dashboard`, push, enable Pages (main branch, root).
-2. DNS: `CNAME` record `marketing` → `marcelo011global.github.io` on the 011telecom.com DNS host.
-3. Firebase console → Authentication → Settings → Authorized domains: add `marketing.011telecom.com`.
+2. DNS: `CNAME` record `marketing` → `marcelo011global.github.io` on the 011global.com DNS host.
+3. Firebase console → Authentication → Settings → Authorized domains: add `marketing.011global.com`.
 4. Firestore rules: allow signed-in company users to read `mkt_*`, and write
    `mkt_proposals` (decision fields only), `mkt_activity`, `mkt_sampleDecisions`, `mkt_sampleActivity`.
 
 ## Company Info
-- **Company**: 011 Telecom LLC · **CEO**: Marcelo Licht (marcelo@011global.com)
-- **Firebase project**: telecom-deals-f155b
+- **Company**: 011 Global · **Contact**: Marcelo Licht (marcelo@011global.com)
+- **Firebase project**: telecom-deals-f155b (shared with the 011 Telecom deals dashboard)

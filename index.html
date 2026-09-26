@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>011 Telecom — Marketing</title>
+<title>011 Global — Marketing</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 52 34'%3E%3Ccircle cx='7' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='7' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='45' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='7' cy='31' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='31' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='31' r='5' fill='%23F47B20'/%3E%3C/svg%3E">
 <style>
 :root{--orange:#F47B20;--orange-light:#FEF0E4;--orange-dark:#C5610F;--dark:#1A1A1A;--mid:#555;--muted:#888;--border:#E5E5E5;--bg:#F7F7F5;--white:#FFFFFF;--green:#0F6E56;--green-light:#E1F5EE;--red:#A32D2D;--red-light:#FCEBEB;--amber:#8A5A00;--amber-light:#FFF4D6;--radius:10px;--radius-sm:6px;}
@@ -12,7 +12,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
 a{color:inherit;}
 button{font-family:inherit;}
 
-/* Auth — same look as deals.011telecom.com */
+/* Auth — same look as the deals dashboard */
 #auth-screen{display:none;align-items:center;justify-content:center;min-height:100vh;padding:1rem;}
 .auth-card{background:var(--white);border-radius:16px;border:1px solid var(--border);padding:2.5rem;width:100%;max-width:420px;}
 .auth-card .logo{margin-bottom:2rem;}
@@ -105,6 +105,9 @@ th:first-child,td:first-child{text-align:left;}
 tr:last-child td{border-bottom:none;}
 tr.link{cursor:pointer;}
 tr.link:hover td{background:#FCFBF9;}
+tr.sel td{background:var(--orange-light);}
+tr.sel:hover td{background:var(--orange-light);}
+td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor:pointer;}
 .bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
 .bar i{display:block;height:8px;border-radius:0 4px 4px 0;background:var(--orange);min-width:2px;}
 .bar .track{width:90px;display:flex;justify-content:flex-start;}
@@ -205,7 +208,7 @@ tr.link:hover td{background:#FCFBF9;}
         <circle cx="7" cy="7" r="5"/><circle cx="19" cy="7" r="5"/><circle cx="31" cy="7" r="5"/>
         <circle cx="7" cy="19" r="5"/><circle cx="19" cy="19" r="5"/><circle cx="31" cy="19" r="5"/><circle cx="45" cy="19" r="5"/>
         <circle cx="7" cy="31" r="5"/><circle cx="19" cy="31" r="5"/><circle cx="31" cy="31" r="5"/>
-      </svg>011<em>telecom</em>
+      </svg>011<em>global</em>
     </a>
     <h2>Marketing</h2>
     <p>Campaign performance by market, reviews and suggestions.</p>
@@ -229,10 +232,11 @@ tr.link:hover td{background:#FCFBF9;}
           <circle cx="7" cy="7" r="5"/><circle cx="19" cy="7" r="5"/><circle cx="31" cy="7" r="5"/>
           <circle cx="7" cy="19" r="5"/><circle cx="19" cy="19" r="5"/><circle cx="31" cy="19" r="5"/><circle cx="45" cy="19" r="5"/>
           <circle cx="7" cy="31" r="5"/><circle cx="19" cy="31" r="5"/><circle cx="31" cy="31" r="5"/>
-        </svg>011<em>telecom</em>
+        </svg>011<em>global</em>
       </a>
       <span class="app-name">Marketing</span>
-      <a class="nav-btn" id="nav-performance" href="#/performance">Performance</a>
+      <a class="nav-btn" id="nav-performance" href="#/performance">Markets</a>
+      <a class="nav-btn" id="nav-campaigns" href="#/campaigns">Campaigns</a>
       <a class="nav-btn" id="nav-reviews" href="#/reviews">Reviews <span class="count" id="nav-count" style="display:none"></span></a>
     </div>
     <div class="topbar-right">
@@ -256,7 +260,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, doc, setDoc, query, orderBy, onSnapshot, serverTimestamp, getDocs, where, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Same Firebase project as deals.011telecom.com — one login for both sites.
+// Same Firebase project as the deals dashboard — one login for both sites.
 // Marketing data lives in its own `mkt_*` collections (see CLAUDE.md).
 const firebaseConfig = {
   apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
@@ -288,6 +292,7 @@ const S = {
   reviews: [], activityBase: [], activityDocs: [],
   days: [7,30,90].includes(+lsGet('mkt.days')) ? +lsGet('mkt.days') : 30,
   reviewMarket: 'all',
+  campMarket: 'all', campSel: new Set(), chartIds: [],
   unsubs: [],
 };
 // Sample-mode decisions go to their own collections so they can never be
@@ -461,6 +466,8 @@ const KPIS = [
   { key:'roas', label:'ROAS', f:fmt.x, good:'up' },
   { key:'ctr', label:'CTR', f:fmt.pct, good:'up' },
 ];
+const KPI = Object.fromEntries(KPIS.map(k => [k.key, k]));
+KPI.clicks = { key:'clicks', label:'Clicks', f:fmt.int, good:'up' };
 function delta(cur, prev, good){
   if (!isFinite(cur) || !isFinite(prev) || prev === 0) return '<span class="delta">—</span>';
   const d = (cur - prev) / prev, up = d >= 0;
@@ -533,8 +540,8 @@ function sparkline(values){
 }
 
 // ─────────────────────── Views ───────────────────────
-function kpiRow(A, B){
-  return `<div class="kpis">${KPIS.map(k => `<div class="card kpi"><div class="lbl">${k.label}</div>
+function kpiRow(A, B, list = KPIS){
+  return `<div class="kpis">${list.map(k => `<div class="card kpi"><div class="lbl">${k.label}</div>
     <div class="val">${k.f(M[k.key](A))}</div>${delta(M[k.key](A), M[k.key](B), k.good)} <span class="delta vs">vs prior ${S.days}d</span></div>`).join('')}</div>`;
 }
 const pendingFor = marketId => proposals().filter(p => p.status === 'pending' && (!marketId || p.marketId === marketId));
@@ -591,6 +598,7 @@ function viewMarket(id){
   const A = aggFor(ids, cur), B = aggFor(ids, prev);
   const pend = pendingFor(id);
   const campRows = cs.map(c => ({ c, a: aggFor([c.id], cur) })).sort((x, y) => y.a.cost - x.a.cost);
+  S.chartIds = ids;
   return `
   <a class="crumb" href="#/performance">← All markets</a>
   <div class="page-head"><div style="display:flex;gap:12px;align-items:center">${flags(m).replace('class="flags"', 'class="flags" style="font-size:30px"')}
@@ -609,7 +617,7 @@ function viewMarket(id){
   <h2 class="sec">Campaigns</h2>
   <div class="table-wrap"><table>
     <thead><tr><th>Campaign</th><th>Type</th><th>Status</th><th>Budget / day</th><th>Spend</th><th>Clicks</th><th>CTR</th><th>Conv.</th><th>Cost / conv.</th><th>ROAS</th></tr></thead>
-    <tbody>${campRows.map(({ c, a }) => `<tr>
+    <tbody>${campRows.map(({ c, a }) => `<tr class="link" onclick="openCampaign('${esc(c.id)}')" title="Open charts for this campaign">
       <td>${esc(c.name)}</td><td>${esc(c.type)}</td>
       <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
       <td>${fmt.money(c.dailyBudget)}</td><td>${fmt.money(a.cost)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
@@ -620,12 +628,53 @@ function viewMarket(id){
       <span class="tag type">${esc(TYPE_LABEL[p.type] || p.type)}</span>${esc(p.title)}<span class="go">Review →</span></a>`).join('')}</div>`
     : `<div class="card empty" style="padding:1.25rem">Nothing waiting for review in this market.</div>`}`;
 }
-function drawMarketCharts(id){
-  const pts = daily(idsOf(campaignsOf(id)), period(0));
-  document.querySelectorAll('[data-chart]').forEach(el => {
-    const k = el.dataset.chart;
-    lineChart(el, pts.map(p => ({ date: p.date, v: p[k] })), k === 'cost' ? fmt.money : fmt.int);
-  });
+const CHART_FMT = { cost: fmt.money, clicks: fmt.int, conversions: fmt.int };
+function drawCharts(){
+  const els = document.querySelectorAll('[data-chart]');
+  if (!els.length) return;
+  const pts = daily(S.chartIds, period(0));
+  els.forEach(el => { const k = el.dataset.chart; lineChart(el, pts.map(p => ({ date: p.date, v: p[k] })), CHART_FMT[k]); });
+}
+
+function viewCampaigns(){
+  const cur = period(0), prev = period(1), mf = S.campMarket;
+  const list = S.campaigns.filter(c => mf === 'all' || c.marketId === mf);
+  const sel = list.filter(c => S.campSel.has(c.id));
+  const ids = idsOf(sel.length ? sel : list);
+  S.chartIds = ids;
+  const A = aggFor(ids, cur), B = aggFor(ids, prev);
+  const rows = list.map(c => ({ c, a: aggFor([c.id], cur) })).sort((x, y) => y.a.cost - x.a.cost);
+  const scope = sel.length === 1 ? sel[0].name
+    : sel.length ? `${sel.length} selected campaigns`
+    : mf === 'all' ? `All ${list.length} campaigns` : `All campaigns in ${marketById(mf)?.name || mf}`;
+  const chart = (k, title) => `<div class="card chart-card"><h3>${title}</h3><div class="csub">${esc(scope)} · per day</div><div class="chart" data-chart="${k}"></div></div>`;
+  return `
+  <div class="page-head"><div><h1>Campaigns</h1>
+    <div class="sub">Showing <b>${esc(scope)}</b> · ${dShort(cur.start)} – ${dShort(cur.end)}</div></div></div>
+  <div class="filters">
+    Market <select class="select" onchange="setCampMarket(this.value)">
+      <option value="all">All markets</option>
+      ${S.markets.map(m => `<option value="${esc(m.id)}" ${mf === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}
+    </select>
+    Campaign <select class="select" onchange="setCampOne(this.value)">
+      <option value="">${sel.length > 1 ? `${sel.length} selected` : 'All campaigns'}</option>
+      ${list.map(c => `<option value="${esc(c.id)}" ${sel.length === 1 && sel[0].id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
+    </select>
+    ${sel.length ? `<button class="btn" onclick="setCampOne('')">Show all</button>` : ''}
+    <span>Tick several campaigns in the table below to combine them.</span>
+  </div>
+  ${kpiRow(A, B, [KPI.cost, KPI.clicks, KPI.conversions, KPI.cpa, KPI.ctr, KPI.roas])}
+  <div class="charts" style="margin-top:12px">${chart('cost', 'Spend')}${chart('clicks', 'Clicks')}${chart('conversions', 'Conversions')}</div>
+  <h2 class="sec">Campaigns</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:36px"></th><th style="text-align:left">Campaign</th><th>Status</th><th>Spend</th><th>Clicks</th><th>CTR</th><th>Conversions</th><th>Cost / conv.</th><th>ROAS</th></tr></thead>
+    <tbody>${rows.map(({ c, a }) => { const m = marketById(c.marketId), on = S.campSel.has(c.id); return `<tr class="link${on ? ' sel' : ''}" onclick="toggleCamp('${esc(c.id)}')">
+      <td><input type="checkbox" ${on ? 'checked' : ''} aria-label="Include ${esc(c.name)}" onclick="event.stopPropagation();toggleCamp('${esc(c.id)}')"></td>
+      <td style="text-align:left">${m ? flags(m) : ''}${esc(c.name)}</td>
+      <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
+      <td>${fmt.money(a.cost)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
+      <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a))}</td><td>${fmt.x(M.roas(a))}</td></tr>`; }).join('')}</tbody>
+  </table></div>`;
 }
 
 const TYPE_LABEL = {
@@ -737,6 +786,10 @@ function viewReviews(tab, marketFilter){
 // ─────────────────────── Actions ───────────────────────
 window.setRange = v => { S.days = +v; lsSet('mkt.days', v); render(); };
 window.setReviewMarket = v => { S.reviewMarket = v; render(); };
+window.setCampMarket = v => { S.campMarket = v; S.campSel = new Set(); render(); };
+window.setCampOne = v => { S.campSel = new Set(v ? [v] : []); render(); };
+window.toggleCamp = id => { S.campSel.has(id) ? S.campSel.delete(id) : S.campSel.add(id); render(); };
+window.openCampaign = id => { const c = campaignById(id); S.campMarket = c?.marketId || 'all'; S.campSel = new Set([id]); if (location.hash === '#/campaigns') render(); else location.hash = '#/campaigns'; };
 window.decide = async function(id, status){
   const p = proposals().find(x => x.id === id); if (!p) return;
   const note = status === 'pending' ? '' : (document.getElementById('note-' + id)?.value || '').trim();
@@ -774,10 +827,12 @@ function render(){
   cnt.textContent = n; cnt.style.display = n ? '' : 'none';
 
   const [, section = 'performance', a, b] = (location.hash || '#/performance').split('/');
-  document.getElementById('nav-performance').classList.toggle('active', section !== 'reviews');
+  document.getElementById('nav-performance').classList.toggle('active', section === 'performance' || section === 'market');
+  document.getElementById('nav-campaigns').classList.toggle('active', section === 'campaigns');
   document.getElementById('nav-reviews').classList.toggle('active', section === 'reviews');
   const y = window.scrollY, same = render.last === location.hash;
-  if (section === 'market') { view.innerHTML = viewMarket(a); drawMarketCharts(a); }
+  if (section === 'market') { view.innerHTML = viewMarket(a); drawCharts(); }
+  else if (section === 'campaigns') { view.innerHTML = viewCampaigns(); drawCharts(); }
   else if (section === 'reviews') view.innerHTML = viewReviews(a || 'pending', b);
   else view.innerHTML = viewPerformance();
   window.scrollTo(0, same ? y : 0);
@@ -785,7 +840,7 @@ function render(){
 }
 window.addEventListener('hashchange', render);
 let resizeT;
-window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (location.hash.startsWith('#/market/')) drawMarketCharts(location.hash.split('/')[2]); }, 150); });
+window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(drawCharts, 150); });
 
 // ─────────────────────── Sample data ───────────────────────
 // Stand-in until the backend syncs real Google Ads data into the mkt_*
