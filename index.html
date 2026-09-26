@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>011 Global — Marketing</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 52 34'%3E%3Ccircle cx='7' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='7' r='5' fill='%23F47B20'/%3E%3Ccircle cx='7' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='45' cy='19' r='5' fill='%23F47B20'/%3E%3Ccircle cx='7' cy='31' r='5' fill='%23F47B20'/%3E%3Ccircle cx='19' cy='31' r='5' fill='%23F47B20'/%3E%3Ccircle cx='31' cy='31' r='5' fill='%23F47B20'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="favicon.png">
 <style>
-:root{--orange:#F47B20;--orange-light:#FEF0E4;--orange-dark:#C5610F;--dark:#1A1A1A;--mid:#555;--muted:#888;--border:#E5E5E5;--bg:#F7F7F5;--white:#FFFFFF;--green:#0F6E56;--green-light:#E1F5EE;--red:#A32D2D;--red-light:#FCEBEB;--amber:#8A5A00;--amber-light:#FFF4D6;--radius:10px;--radius-sm:6px;}
+:root{--orange:#EE7805;--orange-light:#FDF0E3;--orange-dark:#C46204;--dark:#1A1A1A;--mid:#555;--muted:#888;--border:#E5E5E5;--bg:#F7F7F5;--white:#FFFFFF;--green:#0F6E56;--green-light:#E1F5EE;--red:#A32D2D;--red-light:#FCEBEB;--amber:#8A5A00;--amber-light:#FFF4D6;--radius:10px;--radius-sm:6px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh;font-size:14px;}
 a{color:inherit;}
@@ -35,8 +35,8 @@ button{font-family:inherit;}
 .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 1.5rem;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;flex-wrap:wrap;}
 .topbar-left,.topbar-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .logo{display:flex;align-items:center;gap:9px;font-size:19px;font-weight:800;color:var(--dark);text-decoration:none;letter-spacing:-0.01em;}
-.logo .logo-iso circle{fill:var(--orange);}
-.logo em{color:var(--orange);font-style:normal;margin-left:5px;}
+.logo-img{height:30px;width:auto;display:block;}
+.auth-card .logo-img{height:44px;}
 .app-name{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding-left:10px;margin-right:10px;border-left:1px solid var(--border);}
 .nav-btn{padding:6px 11px;border-radius:var(--radius-sm);border:none;background:transparent;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
 .nav-btn:hover{color:var(--dark);background:var(--bg);}
@@ -204,11 +204,7 @@ td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor
 <div id="auth-screen">
   <div class="auth-card">
     <a class="logo" href="#">
-      <svg class="logo-iso" viewBox="0 0 52 34" width="34" height="22" aria-hidden="true">
-        <circle cx="7" cy="7" r="5"/><circle cx="19" cy="7" r="5"/><circle cx="31" cy="7" r="5"/>
-        <circle cx="7" cy="19" r="5"/><circle cx="19" cy="19" r="5"/><circle cx="31" cy="19" r="5"/><circle cx="45" cy="19" r="5"/>
-        <circle cx="7" cy="31" r="5"/><circle cx="19" cy="31" r="5"/><circle cx="31" cy="31" r="5"/>
-      </svg>011<em>global</em>
+      <img src="logo.png" alt="011 Global" class="logo-img">
     </a>
     <h2>Marketing</h2>
     <p>Campaign performance by market, reviews and suggestions.</p>
@@ -228,11 +224,7 @@ td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor
   <header class="topbar">
     <div class="topbar-left">
       <a class="logo" href="#/performance">
-        <svg class="logo-iso" viewBox="0 0 52 34" width="34" height="22" aria-hidden="true">
-          <circle cx="7" cy="7" r="5"/><circle cx="19" cy="7" r="5"/><circle cx="31" cy="7" r="5"/>
-          <circle cx="7" cy="19" r="5"/><circle cx="19" cy="19" r="5"/><circle cx="31" cy="19" r="5"/><circle cx="45" cy="19" r="5"/>
-          <circle cx="7" cy="31" r="5"/><circle cx="19" cy="31" r="5"/><circle cx="31" cy="31" r="5"/>
-        </svg>011<em>global</em>
+        <img src="logo.png" alt="011 Global" class="logo-img">
       </a>
       <span class="app-name">Marketing</span>
       <a class="nav-btn" id="nav-performance" href="#/performance">Markets</a>
@@ -697,11 +689,11 @@ function evidence(p){
 function creativeSvg(c, i){
   const words = c.headline.split(' '), lines = [''];
   for (const w of words) { if ((lines[lines.length - 1] + ' ' + w).trim().length > 20) lines.push(w); else lines[lines.length - 1] = (lines[lines.length - 1] + ' ' + w).trim(); }
-  const dots = [[7,7],[19,7],[31,7],[7,19],[19,19],[31,19],[45,19],[7,31],[19,31],[31,31]];
   return `<svg viewBox="0 0 382 200" role="img" aria-label="${esc(c.headline)}">
     <rect width="382" height="200" fill="${c.bg}"/>
-    <g transform="translate(22,20) scale(.55)">${dots.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="${c.accent}"/>`).join('')}</g>
-    ${lines.map((l, j) => `<text x="22" y="${78 + j * 30}" font-size="25" font-weight="800" fill="${c.fg}" font-family="-apple-system,Segoe UI,sans-serif" ${c.rtl ? 'direction="rtl" unicode-bidi="plaintext"' : ''}>${esc(l)}</text>`).join('')}
+    <g transform="translate(22,14)"><circle cx="17" cy="17" r="17" fill="${c.accent}"/><path d="M5 27 L2 38 L13 31 Z" fill="${c.accent}"/>
+      <text x="17" y="22" font-size="13" font-weight="900" fill="#fff" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif">011</text></g>
+    ${lines.map((l, j) => `<text x="${c.rtl ? 360 : 22}" y="${78 + j * 30}" font-size="25" font-weight="800" fill="${c.fg}" font-family="-apple-system,Segoe UI,sans-serif" ${c.rtl ? 'direction="rtl"' : ''}>${esc(l)}</text>`).join('')}
     <text x="22" y="${88 + lines.length * 30}" font-size="13" fill="${c.fg}" opacity=".8" font-family="-apple-system,Segoe UI,sans-serif">${esc(c.sub)}</text>
     <rect x="262" y="150" width="98" height="30" rx="15" fill="${c.accent}"/>
     <text x="311" y="170" font-size="12.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif">${esc(c.cta)}</text>
@@ -915,9 +907,9 @@ function loadSample(){
       title:'Refresh images for IL→US Performance Max',
       rationale:'Click-through rate on this campaign has dropped steadily for about two months while impressions stayed flat — the classic sign of creative fatigue. The image tool generated three new variants from the brand kit. Approving adds them to the asset group alongside the current images; the weakest current asset is removed after 14 days if the new ones win.',
       creatives:[
-        { headline:'Call Israel like you never left', sub:'Crystal-clear calls to family, any time', cta:'Start now', bg:'#1A1A1A', fg:'#FFFFFF', accent:'#F47B20', note:'Dark, brand orange' },
-        { headline:'Shabbat dinner calls, sorted', sub:'Low rates to Israeli mobiles and landlines', cta:'See rates', bg:'#FEF0E4', fg:'#1A1A1A', accent:'#F47B20', note:'Light, warm' },
-        { headline:'קרוב לבית, תמיד', sub:'Unlimited calling to Israel from the US', cta:'Try it', bg:'#F47B20', fg:'#FFFFFF', accent:'#1A1A1A', note:'Hebrew headline', rtl:true },
+        { headline:'Call Israel like you never left', sub:'Crystal-clear calls to family, any time', cta:'Start now', bg:'#1A1A1A', fg:'#FFFFFF', accent:'#EE7805', note:'Dark, brand orange' },
+        { headline:'Shabbat dinner calls, sorted', sub:'Low rates to Israeli mobiles and landlines', cta:'See rates', bg:'#FDF0E3', fg:'#1A1A1A', accent:'#EE7805', note:'Light, warm' },
+        { headline:'קרוב לבית, תמיד', sub:'Unlimited calling to Israel from the US', cta:'Try it', bg:'#EE7805', fg:'#FFFFFF', accent:'#1A1A1A', note:'Hebrew headline', rtl:true },
       ],
       impact:'Recover CTR toward its level two months ago' },
     { id:'p-104', marketId:'gb-es', campaignId:'gb-es-search', type:'add_keywords', level:'approval', source:'Weekly review', createdAt:hrs(28), status:'pending',

@@ -16,7 +16,7 @@ diaspora calling corridors (e.g. Brazilians in USA, Israelis in USA). Three sect
 
 Sibling of [011-deals-dashboard](https://github.com/marcelo011global/011-deals-dashboard)
 (deals.011telecom.com, 011 Telecom) and teligen-crm: same build philosophy (single HTML
-file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global (wordmark `011global`).
+file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global: `logo.png` (trimmed from the official logo), `favicon.png` (the orange "011" speech bubble), brand orange `#EE7805` sampled from the logo.
 
 ## Live URL
 - Production: https://marketing.011global.com (GitHub Pages — see Setup below)
