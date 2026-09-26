@@ -24,9 +24,9 @@ var CONFIG = {
   FIRESTORE: 'projects/telecom-deals-f155b/databases/(default)/documents',
   // Google Ads account per market, digits only (no dashes).
   MARKETS: [
-    { id: 'il', customerId: 'REPLACE_ISRAEL_ACCOUNT_ID', name: 'Israel', flags: ['🇮🇱'],
+    { id: 'il', customerId: '2438876474', name: 'Israel', flags: ['🇮🇱'],
       subtitle: 'Number porting · Israelis abroad & olim from the US/Canada', language: 'Hebrew & English' },
-    { id: 'br', customerId: 'REPLACE_BRAZIL_ACCOUNT_ID', name: 'Brazil', flags: ['🇧🇷'],
+    { id: 'br', customerId: '1220279929', name: 'Brazil', flags: ['🇧🇷'],
       subtitle: 'Brazilians abroad · calls and numbers', language: 'Portuguese & English' },
   ],
   // USD per 1 unit of account currency, for cross-market totals on the overview.
