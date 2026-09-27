@@ -83,5 +83,5 @@ market's Google Ads account is converted correctly.
    the `adwords` scope is unused here and can be removed), link the same Cloud
    project number 182881118188.
 2. Script properties: `META_TOKEN` = the token.
-3. Fill `META.ACCOUNTS` with the ad account IDs.
+3. `META.ACCOUNTS` has Israel (584900745480085); add Brazil when known (accounts without an ID are skipped).
 4. Run `testConnection`, then `backfill`, then `installDailyTrigger` (runs ~3am).

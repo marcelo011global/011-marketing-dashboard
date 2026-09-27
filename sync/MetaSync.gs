@@ -22,8 +22,8 @@ var META = {
   // One entry per Meta ad account. marketId must match a market in the dashboard
   // ('il' Israel, 'br' Brazil). accountId: the number from Ads Manager, no "act_".
   ACCOUNTS: [
-    { marketId: 'il', accountId: 'REPLACE_ISRAEL_META_ACCOUNT_ID' },
-    { marketId: 'br', accountId: 'REPLACE_BRAZIL_META_ACCOUNT_ID' },
+    { marketId: 'il', accountId: '584900745480085' },   // 011 Global Israel
+    { marketId: 'br', accountId: 'REPLACE_BRAZIL_META_ACCOUNT_ID' },   // not found yet in the 011Global portfolio
   ],
 };
 
@@ -42,8 +42,11 @@ function installDailyTrigger() {
   ScriptApp.newTrigger('dailySync').timeBased().everyDays(1).atHour(3).create();
 }
 
+// Accounts whose ID hasn't been filled in yet are skipped.
+function accounts_() { return META.ACCOUNTS.filter(function (a) { return /^\d+$/.test(a.accountId); }); }
+
 function testConnection() {
-  META.ACCOUNTS.forEach(function (a) {
+  accounts_().forEach(function (a) {
     var acc = graph_('act_' + a.accountId, { fields: 'name,currency,account_status' });
     Logger.log(a.marketId + ': ' + JSON.stringify(acc));
   });
@@ -53,7 +56,7 @@ function testConnection() {
 function syncAll_(days) {
   if (!META.TOKEN) throw new Error('Set META_TOKEN in Project Settings → Script properties.');
   var until = ymd_(addDays_(new Date(), -1)), since = ymd_(addDays_(new Date(), -days));
-  META.ACCOUNTS.forEach(function (a) { syncAccount_(a, since, until); });
+  accounts_().forEach(function (a) { syncAccount_(a, since, until); });
 }
 
 function syncAccount_(a, since, until) {
