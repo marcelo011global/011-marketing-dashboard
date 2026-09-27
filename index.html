@@ -552,16 +552,17 @@ function ago(d){
 
 // ─────────────────────── Charts ───────────────────────
 // Round axis steps (1/2/5 × 10^k), at most 5 intervals above zero.
-function niceScale(v){
-  if (!(v > 0)) return { max: 1, step: .25 };
+// Counts (whole=true) never get fractional steps, so an all-zero series reads 0–1.
+function niceScale(v, whole){
+  if (!(v > 0)) return whole ? { max: 1, step: 1 } : { max: 1, step: .25 };
   for (let k = Math.floor(Math.log10(v)) - 1; ; k++)
-    for (const b of [1, 2, 5]) { const step = b * 10 ** k; if (Math.ceil(v / step) <= 5) return { max: Math.ceil(v / step) * step, step }; }
+    for (const b of [1, 2, 5]) { const step = b * 10 ** k; if (whole && step < 1) continue; if (Math.ceil(v / step) <= 5) return { max: Math.ceil(v / step) * step, step }; }
 }
 // Single-series line chart with crosshair + tooltip. One measure per chart —
 // spend and conversions get separate charts rather than a dual axis.
 function lineChart(el, points, f){
   const W = Math.max(280, el.clientWidth), H = 200, P = { t:12, r:14, b:26, l:54 };
-  const n = points.length, { max, step: tick } = niceScale(Math.max(...points.map(p => p.v)) * 1.02);
+  const n = points.length, { max, step: tick } = niceScale(Math.max(...points.map(p => p.v)) * 1.02, f === fmt.int);
   const iw = W - P.l - P.r, ih = H - P.t - P.b;
   const x = i => P.l + (n > 1 ? i * iw / (n - 1) : iw / 2);
   const y = v => P.t + ih * (1 - v / max);
