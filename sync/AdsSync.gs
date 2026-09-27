@@ -45,6 +45,7 @@ function dailySync() { syncAll_(14); }
 
 /** Run once: schedules dailySync every day around 2am (script time zone). */
 function installDailyTrigger() {
+  requireScopes_();
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'dailySync') ScriptApp.deleteTrigger(t);
   });
@@ -53,6 +54,7 @@ function installDailyTrigger() {
 
 /** Quick check that the token and account IDs work, without writing anything. */
 function testConnection() {
+  requireScopes_();
   CONFIG.MARKETS.forEach(function (m) {
     var rows = gaql_(m.customerId, 'SELECT customer.descriptive_name, customer.currency_code FROM customer');
     Logger.log(m.id + ': ' + JSON.stringify(rows[0] && rows[0].customer));
@@ -60,7 +62,12 @@ function testConnection() {
 }
 
 // ───────────────────────── Sync ─────────────────────────
+// Google shows each permission as its own checkbox; if one was left unticked,
+// Apps Script won't ask again unless the script requires it. This re-prompts.
+function requireScopes_() { ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL); }
+
 function syncAll_(days) {
+  requireScopes_();
   if (!CONFIG.DEVELOPER_TOKEN || !CONFIG.LOGIN_CUSTOMER_ID) throw new Error('Set DEVELOPER_TOKEN in Project Settings → Script properties.');
   var end = ymd_(addDays_(new Date(), -1));
   var start = ymd_(addDays_(new Date(), -days));

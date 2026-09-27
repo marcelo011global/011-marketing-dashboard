@@ -36,6 +36,7 @@ function backfill() { syncAll_(180); }
 function dailySync() { syncAll_(14); }
 
 function installDailyTrigger() {
+  requireScopes_();
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'dailySync') ScriptApp.deleteTrigger(t);
   });
@@ -46,6 +47,7 @@ function installDailyTrigger() {
 function accounts_() { return META.ACCOUNTS.filter(function (a) { return /^\d+$/.test(a.accountId); }); }
 
 function testConnection() {
+  requireScopes_();
   accounts_().forEach(function (a) {
     var acc = graph_('act_' + a.accountId, { fields: 'name,currency,account_status' });
     Logger.log(a.marketId + ': ' + JSON.stringify(acc));
@@ -53,7 +55,10 @@ function testConnection() {
 }
 
 // ───────────────────────── Sync ─────────────────────────
+function requireScopes_() { ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL); }
+
 function syncAll_(days) {
+  requireScopes_();
   if (!META.TOKEN) throw new Error('Set META_TOKEN in Project Settings → Script properties.');
   var until = ymd_(addDays_(new Date(), -1)), since = ymd_(addDays_(new Date(), -days));
   accounts_().forEach(function (a) { syncAccount_(a, since, until); });
