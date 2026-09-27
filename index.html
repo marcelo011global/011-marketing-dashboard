@@ -192,6 +192,25 @@ td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor
 .track.bad{color:var(--red);} .track.bad b{background:var(--red);}
 .track.warn{color:var(--amber);} .track.warn b{background:var(--amber);}
 .track .tnote{font-weight:400;color:var(--mid);margin-top:4px;line-height:1.5;}
+table.pages td{white-space:normal;vertical-align:top;text-align:left;}
+table.pages th{text-align:left;}
+table.pages td.pg{min-width:260px;max-width:420px;}
+table.pages td.pg a{color:var(--orange-dark);font-weight:600;text-decoration:none;word-break:break-all;}
+table.pages td.pg a:hover{text-decoration:underline;}
+table.pages .hl{font-size:12.5px;margin-top:3px;}
+table.pages .nt{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45;}
+table.pages td.uf{min-width:160px;}
+table.pages td.acts{white-space:nowrap;text-align:right;}
+.count-muted{font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;margin-left:6px;}
+.page-form{margin-bottom:1rem;}
+.page-form h3{font-size:15px;margin-bottom:10px;}
+.pf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 12px;}
+.pf-grid label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.04em;}
+.pf-grid label.wide{grid-column:span 2;}
+.pf-grid input,.pf-grid select,.pf-grid textarea{font:inherit;font-size:13px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--dark);padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--white);}
+.pf-grid input:focus,.pf-grid select:focus,.pf-grid textarea:focus{outline:none;border-color:var(--orange);}
+.pf-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+@media (max-width:760px){.pf-grid{grid-template-columns:1fr 1fr;}.pf-grid label.wide{grid-column:span 2;}}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none;z-index:200;max-width:90vw;}
 #toast.error{background:var(--red);}
 
@@ -237,6 +256,7 @@ td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor
       <span class="app-name">Marketing</span>
       <a class="nav-btn" id="nav-performance" href="#/performance">Markets</a>
       <a class="nav-btn" id="nav-campaigns" href="#/campaigns">Campaigns</a>
+      <a class="nav-btn" id="nav-pages" href="#/pages">Landing pages</a>
       <a class="nav-btn" id="nav-reviews" href="#/reviews">Reviews <span class="count" id="nav-count" style="display:none"></span></a>
     </div>
     <div class="topbar-right">
@@ -258,7 +278,7 @@ td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, doc, setDoc, query, orderBy, onSnapshot, serverTimestamp, getDocs, where, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, writeBatch, query, orderBy, onSnapshot, serverTimestamp, getDocs, where, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // Same Firebase project as the deals dashboard — one login for both sites.
 // Marketing data lives in its own `mkt_*` collections (see CLAUDE.md).
@@ -292,6 +312,7 @@ const S = {
   reviews: [], activityBase: [], activityDocs: [],
   days: [7,30,90].includes(+lsGet('mkt.days')) ? +lsGet('mkt.days') : 30,
   reviewMarket: 'all',
+  pages: [], pageMarket: 'all', pageForm: null,
   campMarket: 'all', campSel: new Set(), chartIds: [],
   unsubs: [],
 };
@@ -396,6 +417,10 @@ function listen(){
     S.proposalDocs = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }]));
     render();
   }, e => console.warn('Proposals listener:', e.message)));
+  S.unsubs.push(onSnapshot(collection(db, 'mkt_landingPages'), snap => {
+    S.pages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  }, e => console.warn('Landing pages listener:', e.message)));
   S.unsubs.push(onSnapshot(query(collection(db, c.act), orderBy('at', 'desc'), limit(200)), snap => {
     S.activityDocs = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }));
     render();
@@ -708,6 +733,132 @@ function viewCampaigns(){
   ${inMarket.length > list.length ? `<div class="hint">${inMarket.length - list.length} campaign${inMarket.length - list.length === 1 ? '' : 's'} with no activity in this period not shown.</div>` : ''}`;
 }
 
+// ─────────────────────── Landing pages ───────────────────────
+// Real, shared data (not sample): where each campaign sends its traffic.
+const PAGE_STATUS = { live: ['approved', 'Live'], draft: ['approval', 'Draft'], planned: ['auto', 'Planned'], retired: ['', 'Retired'] };
+const PAGE_LANGS = ['Hebrew', 'English', 'Portuguese', 'Spanish'];
+const PAGE_PATHS = ['Callback form', 'Buy online', 'Phone call', 'WhatsApp'];
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : '';
+const MARKET_NAMES = { il: 'Israel', br: 'Brazil' };
+const pageMarkets = () => S.markets.length ? S.markets : Object.entries(MARKET_NAMES).map(([id, name]) => ({ id, name }));
+
+const ISRAEL_STRATEGY_PAGES = [
+  { url:'https://www.011global.com/en/keep-israeli-number', lang:'English', usedFor:'Israelis – Before moving; Israelis – Already abroad', path:'Callback form',
+    headline:'Moving abroad? Your Israeli number stays with you', status:'planned',
+    notes:'Main relocation page. Sections: hero, trust bar, callback form, what keeps working, how porting works, visits to Israel, plans, reviews, FAQ (see landing page draft).' },
+  { url:'https://www.011global.com/he/relocation', lang:'Hebrew', usedFor:'Israelis – Before moving; Israelis – Already abroad', path:'Callback form',
+    headline:'עוברים לחו״ל? המספר הישראלי נשאר איתכם', status:'planned',
+    notes:'Hebrew version of the relocation page. Write natively, not translated: plural, "ניוד" not "העברה".' },
+  { url:'https://www.011global.com/en/keep-israeli-number/already-abroad', lang:'English', usedFor:'Israelis – Already abroad', path:'Callback form',
+    headline:'Already moved? It\'s not too late to keep your number', status:'planned', notes:'Exact path to confirm with the developers.' },
+  { url:'https://www.011global.com/en/keep-israeli-number/bank-codes', lang:'English', usedFor:'Bank and SMS ad groups (campaigns 1–2)', path:'Callback form',
+    headline:'Bank codes not arriving abroad?', status:'planned', notes:'Exact path to confirm with the developers.' },
+  { url:'https://www.011global.com/en/aliyah-keep-your-number', lang:'English', usedFor:'Olim – Before moving', path:'Callback form',
+    headline:'Making aliyah? Keep your US or Canadian number', status:'planned', notes:'Needs its own brief: $7.99 US/Canada plan and a savings calculator.' },
+  { url:'https://www.011global.com/en/keep-us-number-in-israel', lang:'English', usedFor:'Olim – In Israel', path:'Callback form',
+    headline:'Already in Israel? Stop paying $45+ for your US plan', status:'planned', notes:'Say "many US plans cost $45+"; prepaid plans can be $15–25.' },
+  { url:'https://www.011global.com/en/compare', lang:'English', usedFor:'Competitors', path:'Callback form',
+    headline:'How 011 Global compares', status:'planned', notes:'Don\'t name competitors in ad text; the page can compare.' },
+  { url:'https://www.011global.com/he/plans/Israel/101', lang:'Hebrew', usedFor:'Calls to Israel; Brand', path:'Buy online',
+    headline:'Israel plans (Hebrew)', status:'live', notes:'Keep for calls-to-Israel and brand traffic. Fix the translated-sounding copy: plural throughout, "נייח" not "קו קווי", "ניוד" not "העברה".' },
+];
+
+function pageForm(){
+  const f = S.pageForm, opt = (list, v) => list.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  const set = k => `oninput="pf('${k}',this.value)" onchange="pf('${k}',this.value)"`;
+  return `<div class="card page-form">
+    <h3>${f.id ? 'Edit landing page' : 'Add a landing page'}</h3>
+    <div class="pf-grid">
+      <label class="wide">URL<input value="${esc(f.url)}" placeholder="https://www.011global.com/…" ${set('url')}></label>
+      <label>Market<select ${set('marketId')}>${pageMarkets().map(m => `<option value="${esc(m.id)}" ${m.id === f.marketId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
+      <label>Language<select ${set('lang')}>${opt(PAGE_LANGS, f.lang)}</select></label>
+      <label>Status<select ${set('status')}>${Object.entries(PAGE_STATUS).map(([k, [, l]]) => `<option value="${k}" ${k === f.status ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>Main conversion path<select ${set('path')}>${opt(PAGE_PATHS, f.path)}</select></label>
+      <label class="wide">Used for (campaigns / audience)<input value="${esc(f.usedFor)}" placeholder="e.g. Israelis – Already abroad" ${set('usedFor')}></label>
+      <label class="wide">Headline<input value="${esc(f.headline)}" ${set('headline')}></label>
+      <label class="wide">Notes<textarea rows="2" ${set('notes')}>${esc(f.notes)}</textarea></label>
+    </div>
+    <div class="pf-actions"><button class="btn" onclick="closePageForm()">Cancel</button><button class="btn approve" onclick="savePage()">Save</button></div>
+  </div>`;
+}
+
+function viewPages(){
+  const mf = S.pageMarket, order = { live: 0, draft: 1, planned: 2, retired: 3 };
+  const list = S.pages.filter(p => mf === 'all' || p.marketId === mf)
+    .sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || String(a.url).localeCompare(b.url));
+  const markets = pageMarkets().filter(m => mf === 'all' || m.id === mf);
+  const hasIsraelSeed = S.pages.some(p => p.marketId === 'il');
+  const groups = markets.map(m => {
+    const rows = list.filter(p => p.marketId === m.id);
+    return `<h2 class="sec">${m.flags ? flags(m) : ''} ${esc(m.name)} <span class="count-muted">${rows.length} page${rows.length === 1 ? '' : 's'}</span></h2>
+    ${rows.length ? `<div class="table-wrap"><table class="pages">
+      <thead><tr><th>Page</th><th>Language</th><th>Used for</th><th>Main path</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows.map(p => { const [cls, lbl] = PAGE_STATUS[p.status] || PAGE_STATUS.planned, u = safeUrl(p.url); return `<tr>
+        <td class="pg">${u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\/(www\.)?/, ''))}</a>` : esc(p.url)}
+          ${p.headline ? `<div class="hl" dir="auto">${esc(p.headline)}</div>` : ''}${p.notes ? `<div class="nt">${esc(p.notes)}</div>` : ''}</td>
+        <td>${esc(p.lang || '')}</td><td class="uf">${esc(p.usedFor || '')}</td><td>${esc(p.path || '')}</td>
+        <td><span class="tag ${cls}">${lbl}</span></td>
+        <td class="acts"><button class="btn ghost" onclick="editPage('${esc(p.id)}')">Edit</button><button class="btn ghost" onclick="deletePage('${esc(p.id)}')">Delete</button></td>
+      </tr>`; }).join('')}</tbody></table></div>`
+      : `<div class="card empty" style="padding:1.25rem">No landing pages for ${esc(m.name)} yet.</div>`}`;
+  }).join('');
+  return `<div class="page-head"><div><h1>Landing pages</h1>
+      <div class="sub">Where each campaign sends its traffic. New ads and suggestions use this list, so keep it current.</div></div>
+      <button class="btn approve" onclick="openPageForm()">+ Add page</button></div>
+    ${S.pageForm ? pageForm() : ''}
+    <div class="filters">Market <select class="select" onchange="S_setPageMarket(this.value)">
+      <option value="all">All markets</option>
+      ${pageMarkets().map(m => `<option value="${esc(m.id)}" ${mf === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}
+    </select>
+    ${!hasIsraelSeed ? `<button class="btn" onclick="seedIsraelPages()">Add the ${ISRAEL_STRATEGY_PAGES.length} pages from the Israel strategy</button>` : ''}</div>
+    ${groups}`;
+}
+
+window.S_setPageMarket = v => { S.pageMarket = v; render(); };
+window.pf = (k, v) => { if (S.pageForm) S.pageForm[k] = v; };
+window.openPageForm = () => {
+  S.pageForm = { url:'', marketId: S.pageMarket !== 'all' ? S.pageMarket : 'il', lang:'English', status:'planned', path:'Callback form', usedFor:'', headline:'', notes:'' };
+  render(); document.querySelector('.page-form input')?.focus();
+};
+window.editPage = id => { const p = S.pages.find(x => x.id === id); if (!p) return; S.pageForm = { ...p }; render(); window.scrollTo(0, 0); };
+window.closePageForm = () => { S.pageForm = null; document.activeElement?.blur?.(); render(); };
+window.savePage = async function(){
+  const f = S.pageForm; if (!f) return;
+  let url = (f.url || '').trim();
+  if (!url) { toast('Add the page URL first', 'error'); return; }
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  const data = { url, marketId: f.marketId, lang: f.lang, status: f.status, path: f.path,
+                 usedFor: (f.usedFor || '').trim(), headline: (f.headline || '').trim(), notes: (f.notes || '').trim(),
+                 updatedBy: S.user.displayName || S.user.email };
+  document.activeElement?.blur?.();
+  if (LOCAL_PREVIEW) {
+    if (f.id) S.pages = S.pages.map(p => p.id === f.id ? { ...p, ...data } : p);
+    else S.pages.push({ id: 'local-' + Date.now(), ...data });
+    S.pageForm = null; render(); toast('Saved (local preview — not stored)'); return;
+  }
+  try {
+    if (f.id) await setDoc(doc(db, 'mkt_landingPages', f.id), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+    else await addDoc(collection(db, 'mkt_landingPages'), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    S.pageForm = null; render(); toast('Landing page saved');
+  } catch (e) { toast('Could not save: ' + e.message, 'error'); }
+};
+window.deletePage = async function(id){
+  const p = S.pages.find(x => x.id === id); if (!p) return;
+  if (!confirm(`Delete this landing page from the list?\n\n${p.url}\n\nThis only removes it from the dashboard, not from the website.`)) return;
+  if (LOCAL_PREVIEW) { S.pages = S.pages.filter(x => x.id !== id); render(); return; }
+  try { await deleteDoc(doc(db, 'mkt_landingPages', id)); toast('Removed from the list'); }
+  catch (e) { toast('Could not delete: ' + e.message, 'error'); }
+};
+window.seedIsraelPages = async function(){
+  const by = S.user.displayName || S.user.email;
+  if (LOCAL_PREVIEW) { S.pages.push(...ISRAEL_STRATEGY_PAGES.map((p, i) => ({ id: 'seed-' + i, marketId: 'il', ...p }))); render(); return; }
+  try {
+    const b = writeBatch(db);
+    ISRAEL_STRATEGY_PAGES.forEach(p => b.set(doc(collection(db, 'mkt_landingPages')), { marketId: 'il', ...p, updatedBy: by, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+    await b.commit(); toast(`Added ${ISRAEL_STRATEGY_PAGES.length} Israel pages`);
+  } catch (e) { toast('Could not add: ' + e.message, 'error'); }
+};
+
 const TYPE_LABEL = {
   budget_increase:'Budget increase', budget_decrease:'Budget decrease', pause_campaign:'Pause campaign',
   add_keywords:'Add keywords', add_negative_keywords:'Negative keywords', new_creatives:'New creatives', bid_strategy:'Bid strategy',
@@ -849,6 +1000,7 @@ function toast(msg, kind){
 function render(){
   const view = document.getElementById('view');
   if (S.mode === 'loading') { view.innerHTML = '<div class="loading">Loading…</div>'; return; }
+  if (document.activeElement?.closest?.('.page-form') && render.last === location.hash) return;
   const pill = document.getElementById('mode-pill');
   pill.style.display = '';
   pill.className = 'pill' + (S.mode === 'live' ? ' live' : '');
@@ -860,10 +1012,12 @@ function render(){
   const [, section = 'performance', a, b] = (location.hash || '#/performance').split('/');
   document.getElementById('nav-performance').classList.toggle('active', section === 'performance' || section === 'market');
   document.getElementById('nav-campaigns').classList.toggle('active', section === 'campaigns');
+  document.getElementById('nav-pages').classList.toggle('active', section === 'pages');
   document.getElementById('nav-reviews').classList.toggle('active', section === 'reviews');
   const y = window.scrollY, same = render.last === location.hash;
   if (section === 'market') { view.innerHTML = viewMarket(a); drawCharts(); }
   else if (section === 'campaigns') { view.innerHTML = viewCampaigns(); drawCharts(); }
+  else if (section === 'pages') view.innerHTML = viewPages();
   else if (section === 'reviews') view.innerHTML = viewReviews(a || 'pending', b);
   else view.innerHTML = viewPerformance();
   window.scrollTo(0, same ? y : 0);

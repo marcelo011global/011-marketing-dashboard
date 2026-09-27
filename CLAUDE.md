@@ -2,7 +2,7 @@
 
 ## Project Overview
 Marketing dashboard for **011 Global**'s Google Ads campaigns, which target
-Israel and Brazil markets. Three sections:
+Israel and Brazil markets. Four sections:
 
 1. **Performance** — campaigns and conversions grouped by **market**. Two markets:
    **Israel** (number porting, per the strategy doc — Israelis abroad and US/Canadian
@@ -12,7 +12,11 @@ Israel and Brazil markets. Three sections:
    by action, campaign table, pending proposals).
 2. **Campaigns** — spend, clicks and conversions charts for all campaigns, or
    filtered by market / one campaign / several ticked campaigns combined.
-3. **Reviews** — proposals made by the daily rule checks and the weekly agent
+3. **Landing pages** — the shared list of where each campaign sends traffic
+   (URL, market, language, campaigns/audience, main conversion path, headline,
+   status, notes). Real data, editable by the team; one click adds the 8 pages
+   from the Israel strategy. New ads and suggestions should point at pages here.
+4. **Reviews** — proposals made by the daily rule checks and the weekly agent
    review (budget changes, pauses, keywords, bid strategy, new creatives), with
    Approve/Reject, decision history, weekly review summaries and an activity log.
 
@@ -58,6 +62,7 @@ totals, Campaigns page across markets) is converted to USD with `usdRate`
 - `mkt_dailyStats/{campaignId_date}` — {campaignId, marketId, date 'YYYY-MM-DD', impressions, clicks, cost, conversions, leads (callback form), purchases, value} — cost/value in the market's currency
 - `mkt_proposals/{id}` — {marketId, campaignId, type, level (approval|auto_limit), source, title, rationale, impact, change:{label,from,to}, keywords[], creatives[], createdAt, status (pending|approved|rejected|applied)}.
   **The site writes** `status, decidedBy, decidedByEmail, decidedAt, decisionNote` on Approve/Reject; the backend applies approved ones and sets `applied`.
+- `mkt_landingPages/{id}` — **written by the site** (real data in every mode): {url, marketId, lang, status (live|draft|planned|retired), path (Callback form|Buy online|Phone call|WhatsApp), usedFor, headline, notes, updatedBy, createdAt, updatedAt}
 - `mkt_reviews/{id}` — weekly agent review: {weekOf 'YYYY-MM-DD', author, summary, highlights[], concerns[]}
 - `mkt_activity/{id}` — {at, actor, kind, text, marketId?, proposalId?} — **the site** adds one per decision; the backend adds syncs, alerts, auto-applied changes.
 
