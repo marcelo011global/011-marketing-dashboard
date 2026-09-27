@@ -40,9 +40,17 @@ file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global: `logo.png` (trimm
 - **Google Ads sync**: `sync/AdsSync.gs`, a Google Apps Script (same pattern as
   `DriveSync.gs`) that calls the Google Ads API with the owner's login and writes
   `mkt_markets`, `mkt_campaigns`, `mkt_dailyStats` daily. Setup in `sync/README.md`.
+- **Meta sync**: `sync/MetaSync.gs`, same pattern via the Meta Marketing API
+  (System User token in Script properties), writes `platform: 'meta'` rows.
 - **Later**: daily rule checks, weekly Claude review and image/video generation
   write `mkt_proposals` / `mkt_reviews` / `mkt_activity`; this site only reads them
   and records decisions.
+
+## Platforms
+Every campaign has `platform` ('google' | 'meta'; missing = 'google'). A top-bar
+filter (All / Google Ads / Meta, remembered per browser) applies to every page;
+market pages show a "By platform" comparison and overview cards the spend split.
+Adding a platform = a new sync writing the same format + an entry in `PLATFORMS`.
 
 ## Currency
 Each market's pages show its account currency. Anything mixing markets (overview
@@ -58,8 +66,8 @@ totals, Campaigns page across markets) is converted to USD with `usdRate`
 
 ## Firestore Collections (written by the backend unless noted)
 - `mkt_markets/{id}` — {name, subtitle, flags:[emoji], language, currency ('ILS'|'USD'…, the Google Ads account currency), usdRate (USD per 1 unit, for cross-market totals), tracking:{status ('recording'|'not_recording'|'check'), lastConversion 'YYYY-MM-DD', note}}
-- `mkt_campaigns/{id}` — {marketId, name, type (Search|Performance Max|Display|YouTube), status (ENABLED|PAUSED), dailyBudget, googleAdsId}
-- `mkt_dailyStats/{campaignId_date}` — {campaignId, marketId, date 'YYYY-MM-DD', impressions, clicks, cost, conversions, leads (callback form), purchases, value} — cost/value in the market's currency
+- `mkt_campaigns/{id}` — {marketId, platform ('google'|'meta'), name, type, status (ENABLED|PAUSED), dailyBudget, currency? (overrides the market's), googleAdsId | metaId}
+- `mkt_dailyStats/{campaignId_date}` — {campaignId, marketId, platform, date 'YYYY-MM-DD', impressions, clicks, cost, conversions, leads (callback form), purchases, value} — cost/value in the market's currency
 - `mkt_proposals/{id}` — {marketId, campaignId, type, level (approval|auto_limit), source, title, rationale, impact, change:{label,from,to}, keywords[], creatives[], createdAt, status (pending|approved|rejected|applied)}.
   **The site writes** `status, decidedBy, decidedByEmail, decidedAt, decisionNote` on Approve/Reject; the backend applies approved ones and sets `applied`.
 - `mkt_landingPages/{id}` — **written by the site** (real data in every mode): {url, marketId, lang, status (live|draft|planned|retired), path (Callback form|Buy online|Phone call|WhatsApp), usedFor, headline, notes, updatedBy, createdAt, updatedAt}

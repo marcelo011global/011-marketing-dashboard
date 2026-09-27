@@ -1,4 +1,10 @@
-# Google Ads → dashboard sync
+# Ad platform → dashboard syncs
+
+One Google Apps Script project per platform, each writing the same `mkt_*`
+format with a `platform` field. Keep them in **separate** Apps Script projects
+(the function names overlap).
+
+# Google Ads (`AdsSync.gs`)
 
 `AdsSync.gs` is a Google Apps Script that pulls campaign data from the Google Ads
 API once a day and writes it to Firestore, where marketing.011telecom.com reads it.
@@ -52,3 +58,30 @@ The script runs under the existing Firebase project `telecom-deals-f155b`.
 
 Leads and purchases come from each conversion action's category in Google Ads
 (Purchase vs lead categories such as Submit lead form, Contact, Phone call lead).
+
+# Meta (`MetaSync.gs`)
+
+Reads each Meta ad account through the Marketing API (v26.0) and writes
+campaigns and daily stats with `platform: 'meta'`. Leads and purchases come from
+Meta's action types (pixel, Conversions API and on-Meta lead forms). Campaigns
+store their own `currency`, so a Meta account in a different currency from the
+market's Google Ads account is converted correctly.
+
+## 1. Token (Meta Business Manager)
+1. business.facebook.com → **Business settings → Users → System users** → Add
+   (name e.g. "Dashboard sync", role Employee).
+2. **Add assets** → Ad accounts → select the Israel and Brazil ad accounts →
+   permission **View performance**.
+3. **Generate new token** → pick any app of the business (create a simple
+   "Business" app if there is none) → permission **ads_read** → expiration
+   **Never**. Copy the token; it is only shown once.
+4. Note the ad account IDs (Ads Manager → account dropdown; digits only, no `act_`).
+
+## 2. Script
+1. New Apps Script project "011 Global — Meta Sync", paste `MetaSync.gs`,
+   replace the manifest with `appsscript.json` (same scopes as the Google one;
+   the `adwords` scope is unused here and can be removed), link the same Cloud
+   project number 182881118188.
+2. Script properties: `META_TOKEN` = the token.
+3. Fill `META.ACCOUNTS` with the ad account IDs.
+4. Run `testConnection`, then `backfill`, then `installDailyTrigger` (runs ~3am).

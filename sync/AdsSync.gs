@@ -101,6 +101,7 @@ function syncMarket_(m, start, end) {
   camps.forEach(function (r) {
     writes.push(upsert_('mkt_campaigns/' + m.id + '-' + r.campaign.id, {
       marketId: m.id,
+      platform: 'google',
       googleAdsId: String(r.campaign.id),
       name: r.campaign.name,
       type: channelLabel_(r.campaign.advertisingChannelType),
@@ -111,7 +112,7 @@ function syncMarket_(m, start, end) {
   perf.forEach(function (r) {
     var campaignId = m.id + '-' + r.campaign.id, s = split[r.campaign.id + '_' + r.segments.date] || { leads: 0, purchases: 0 };
     writes.push(upsert_('mkt_dailyStats/' + campaignId + '_' + r.segments.date, {
-      campaignId: campaignId, marketId: m.id, date: r.segments.date,
+      campaignId: campaignId, marketId: m.id, platform: 'google', date: r.segments.date,
       impressions: +r.metrics.impressions || 0,
       clicks: +r.metrics.clicks || 0,
       cost: (+r.metrics.costMicros || 0) / 1e6,

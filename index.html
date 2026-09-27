@@ -211,6 +211,11 @@ table.pages td.acts{white-space:nowrap;text-align:right;}
 .pf-grid input:focus,.pf-grid select:focus,.pf-grid textarea:focus{outline:none;border-color:var(--orange);}
 .pf-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
 @media (max-width:760px){.pf-grid{grid-template-columns:1fr 1fr;}.pf-grid label.wide{grid-column:span 2;}}
+.pchip{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:4px;vertical-align:1px;background:#EEF3FE;color:#1A56C4;}
+.pchip.meta{background:#E7F0FF;color:#0645B9;}
+.pchip.google{background:#EAF4EC;color:#1E6B35;}
+.psplit{font-size:12px;margin-top:10px;color:var(--mid);}
+.psplit .muted{color:var(--muted);}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;display:none;z-index:200;max-width:90vw;}
 #toast.error{background:var(--red);}
 
@@ -261,6 +266,11 @@ table.pages td.acts{white-space:nowrap;text-align:right;}
     </div>
     <div class="topbar-right">
       <span id="mode-pill" class="pill" style="display:none"></span>
+      <select id="platform" class="select" onchange="setPlatform(this.value)" aria-label="Platform">
+        <option value="all">All platforms</option>
+        <option value="google">Google Ads</option>
+        <option value="meta">Meta</option>
+      </select>
       <select id="range" class="select" onchange="setRange(this.value)" aria-label="Date range">
         <option value="7">Last 7 days</option>
         <option value="30">Last 30 days</option>
@@ -311,6 +321,7 @@ const S = {
   proposalDocs: new Map(),    // Firestore docs: full proposals (live) or decisions only (sample)
   reviews: [], activityBase: [], activityDocs: [],
   days: [7,30,90].includes(+lsGet('mkt.days')) ? +lsGet('mkt.days') : 30,
+  platform: ['all','google','meta'].includes(lsGet('mkt.platform')) ? lsGet('mkt.platform') : 'all',
   reviewMarket: 'all',
   pages: [], pageMarket: 'all', pageForm: null,
   campMarket: 'all', campSel: new Set(), chartIds: [],
@@ -357,6 +368,7 @@ function enterApp(user){
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-display').textContent = user.displayName || user.email;
   document.getElementById('range').value = String(S.days);
+  document.getElementById('platform').value = S.platform;
   loadData();
 }
 
@@ -457,12 +469,15 @@ const blank = () => ({ impressions:0, clicks:0, cost:0, conversions:0, leads:0, 
 function addRow(a, r, f = 1){ for (const k in a) a[k] += (+r[k] || 0) * (k === 'cost' || k === 'value' ? f : 1); return a; }
 // Each market reports in its Google Ads account currency. A set of campaigns
 // from one market stays in that currency; a mix is converted to USD.
-const currencyOfCampaign = id => marketById(campaignById(id)?.marketId)?.currency || 'USD';
+// A campaign may carry its own currency (e.g. a Meta account billed in USD for
+// a market whose Google Ads account is in ILS); otherwise the market's.
+const currencyOfCampaign = id => { const c = campaignById(id); return c?.currency || marketById(c?.marketId)?.currency || 'USD'; };
 function curOf(campaignIds){
   const set = new Set(campaignIds.map(currencyOfCampaign));
   return set.size === 1 ? [...set][0] : 'USD';
 }
-const usdRate = c => c === 'USD' ? 1 : (S.markets.find(m => m.currency === c)?.usdRate || 1);
+const FX_DEFAULT = { USD: 1, ILS: 0.27, BRL: 0.18, EUR: 1.08, GBP: 1.27 };
+const usdRate = c => c === 'USD' ? 1 : (S.markets.find(m => m.currency === c)?.usdRate || FX_DEFAULT[c] || 1);
 const factor = (id, cur) => usdRate(currencyOfCampaign(id)) / usdRate(cur);
 function aggFor(campaignIds, p, cur = curOf(campaignIds)){
   const a = blank();
@@ -514,7 +529,12 @@ function delta(cur, prev, good){
   if (good && Math.abs(d) >= 0.005) cls = (good === 'up') === up ? 'good' : 'bad';
   return `<span class="delta ${cls}">${up ? '▲' : '▼'} ${Math.abs(d * 100).toFixed(1)}%</span>`;
 }
-const campaignsOf = marketId => S.campaigns.filter(c => c.marketId === marketId);
+// Ad platforms. Campaigns without a platform field are Google Ads (the first sync).
+const PLATFORMS = { google: 'Google Ads', meta: 'Meta' };
+const platformOf = c => c?.platform || 'google';
+const inPlatform = c => S.platform === 'all' || platformOf(c) === S.platform;
+const pchip = c => `<span class="pchip ${esc(platformOf(c))}" title="${esc(PLATFORMS[platformOf(c)] || platformOf(c))}">${esc(platformOf(c) === 'google' ? 'Google' : PLATFORMS[platformOf(c)] || platformOf(c))}</span>`;
+const campaignsOf = marketId => S.campaigns.filter(c => c.marketId === marketId && inPlatform(c));
 const idsOf = cs => cs.map(c => c.id);
 const marketById = id => S.markets.find(m => m.id === id);
 const campaignById = id => S.campaigns.find(c => c.id === id);
@@ -594,11 +614,12 @@ function trackLine(m, long){
   const since = t.lastConversion ? ` · last recorded ${dShort(t.lastConversion)}` : '';
   return `<div class="track ${cls}"><b>${icon}</b> ${label}${since}${long && t.note ? `<div class="tnote">${esc(t.note)}</div>` : ''}</div>`;
 }
-const pendingFor = marketId => proposals().filter(p => p.status === 'pending' && (!marketId || p.marketId === marketId));
+const propInPlatform = p => S.platform === 'all' || platformOf(campaignById(p.campaignId)) === S.platform;
+const pendingFor = marketId => proposals().filter(p => p.status === 'pending' && (!marketId || p.marketId === marketId) && propInPlatform(p));
 
 function viewPerformance(){
   const cur = period(0), prev = period(1);
-  const all = idsOf(S.campaigns);
+  const all = idsOf(S.campaigns.filter(inPlatform));
   const A = aggFor(all, cur), B = aggFor(all, prev);
   const rows = S.markets.map(m => {
     const ids = idsOf(campaignsOf(m.id));
@@ -626,6 +647,7 @@ function viewPerformance(){
         <div class="mstat"><div class="l">CPA</div><div class="v">${fmt.money2(M.cpa(a), c)}</div>${delta(M.cpa(a), M.cpa(b), 'down')}</div>
         <div class="mstat"><div class="l">ROAS</div><div class="v">${fmt.x(M.roas(a))}</div>${delta(M.roas(a), M.roas(b), 'up')}</div>
       </div>
+      ${S.platform === 'all' ? splitLine(ids, cur) : ''}
       <div class="spark"><div class="l"><span>Daily conversions</span><span>${dShort(cur.start)} – ${dShort(cur.end)}</span></div>${sparkline(series)}</div>
     </a>`;
   }).join('')}</div>
@@ -661,6 +683,7 @@ function viewMarket(id){
     <div class="card chart-card"><h3>Daily spend</h3><div class="csub">All campaigns in this market</div><div class="chart" data-chart="cost"></div></div>
     <div class="card chart-card"><h3>Daily conversions</h3><div class="csub">Callback leads + purchases</div><div class="chart" data-chart="conversions"></div></div>
   </div>
+  ${platformSplit(ids, cur, prev)}
   <h2 class="sec">Conversions by action</h2>
   <div class="split">
     ${[['leads','Callback leads'],['purchases','Online purchases']].map(([k, l]) => `<div class="card kpi"><div class="lbl">${l}</div>
@@ -671,7 +694,7 @@ function viewMarket(id){
   <div class="table-wrap"><table>
     <thead><tr><th>Campaign</th><th>Type</th><th>Status</th><th>Budget / day</th><th>Spend</th><th>Clicks</th><th>CTR</th><th>Conv.</th><th>Cost / conv.</th><th>ROAS</th></tr></thead>
     <tbody>${campRows.map(({ c, a }) => `<tr class="link" onclick="openCampaign('${esc(c.id)}')" title="Open charts for this campaign">
-      <td>${esc(c.name)}</td><td>${esc(c.type)}</td>
+      <td>${pchip(c)} ${esc(c.name)}</td><td>${esc(c.type)}</td>
       <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
       <td>${fmt.money(c.dailyBudget, a.cur)}</td><td>${fmt.money(a.cost, a.cur)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
       <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a), a.cur)}</td><td>${fmt.x(M.roas(a))}</td></tr>`).join('')}</tbody>
@@ -681,6 +704,30 @@ function viewMarket(id){
   ${pend.length ? `<div class="mini-props">${pend.map(p => `<a class="mini-prop" href="#/reviews/pending/${esc(p.marketId)}">
       <span class="tag type">${esc(TYPE_LABEL[p.type] || p.type)}</span>${esc(p.title)}<span class="go">Review →</span></a>`).join('')}</div>`
     : `<div class="card empty" style="padding:1.25rem">Nothing waiting for review in this market.</div>`}`;
+}
+function splitLine(ids, cur){
+  const by = {}; ids.forEach(id => { const k = platformOf(campaignById(id)); by[k] = (by[k] || 0) + aggFor([id], cur, 'USD').cost; });
+  const total = Object.values(by).reduce((s, v) => s + v, 0);
+  if (!total || Object.keys(by).length < 2) return '';
+  return `<div class="psplit">${Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="pchip ${esc(k)}">${esc(PLATFORMS[k] || k)}</span> ${Math.round(v / total * 100)}%`).join(' &nbsp; ')} <span class="muted">of spend</span></div>`;
+}
+function platformSplit(ids, cur, prev){
+  const by = {};
+  ids.forEach(id => (by[platformOf(campaignById(id))] ||= []).push(id));
+  const keys = Object.keys(by);
+  if (S.platform !== 'all' || keys.length < 2) return '';
+  const cc = curOf(ids), total = aggFor(ids, cur, cc).cost || 1;
+  const rows = keys.map(k => ({ k, a: aggFor(by[k], cur, cc), b: aggFor(by[k], prev, cc) })).sort((x, y) => y.a.cost - x.a.cost);
+  return `<h2 class="sec">By platform</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Platform</th><th>Spend</th><th>Share</th><th>Clicks</th><th>Conversions</th><th>Leads</th><th>Purchases</th><th>Cost / conv.</th><th>ROAS</th><th>Conv. change</th></tr></thead>
+    <tbody>${rows.map(({ k, a, b }) => `<tr>
+      <td><span class="pchip ${esc(k)}">${esc(PLATFORMS[k] || k)}</span></td>
+      <td>${fmt.money(a.cost, cc)}</td>
+      <td><div class="bar">${Math.round(a.cost / total * 100)}%<span class="btrack"><i style="width:${(a.cost / total * 100).toFixed(1)}%"></i></span></div></td>
+      <td>${fmt.int(a.clicks)}</td><td>${fmt.int(a.conversions)}</td><td>${fmt.int(a.leads)}</td><td>${fmt.int(a.purchases)}</td>
+      <td>${fmt.money2(M.cpa(a), cc)}</td><td>${fmt.x(M.roas(a))}</td><td>${delta(a.conversions, b.conversions, 'up')}</td></tr>`).join('')}</tbody>
+  </table></div>`;
 }
 function drawCharts(){
   const els = document.querySelectorAll('[data-chart]');
@@ -692,7 +739,7 @@ function drawCharts(){
 
 function viewCampaigns(){
   const cur = period(0), prev = period(1), mf = S.campMarket;
-  const inMarket = S.campaigns.filter(c => mf === 'all' || c.marketId === mf);
+  const inMarket = S.campaigns.filter(c => (mf === 'all' || c.marketId === mf) && inPlatform(c));
   const list = inMarket.filter(c => S.campSel.has(c.id) || aggFor([c.id], cur).impressions || aggFor([c.id], cur).cost);
   const sel = list.filter(c => S.campSel.has(c.id));
   const ids = idsOf(sel.length ? sel : list);
@@ -725,7 +772,7 @@ function viewCampaigns(){
     <thead><tr><th style="width:36px"></th><th style="text-align:left">Campaign</th><th>Status</th><th>Spend</th><th>Clicks</th><th>CTR</th><th>Conversions</th><th>Cost / conv.</th><th>ROAS</th></tr></thead>
     <tbody>${rows.map(({ c, a }) => { const m = marketById(c.marketId), on = S.campSel.has(c.id); return `<tr class="link${on ? ' sel' : ''}" onclick="toggleCamp('${esc(c.id)}')">
       <td><input type="checkbox" ${on ? 'checked' : ''} aria-label="Include ${esc(c.name)}" onclick="event.stopPropagation();toggleCamp('${esc(c.id)}')"></td>
-      <td style="text-align:left">${m ? flags(m) : ''}${esc(c.name)}</td>
+      <td style="text-align:left">${m ? flags(m) : ''}${pchip(c)} ${esc(c.name)}</td>
       <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
       <td>${fmt.money(a.cost, a.cur)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
       <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a), a.cur)}</td><td>${fmt.x(M.roas(a))}</td></tr>`; }).join('')}</tbody>
@@ -927,7 +974,7 @@ function proposalCard(p){
 function viewReviews(tab, marketFilter){
   if (marketFilter) S.reviewMarket = marketFilter;
   const mf = S.reviewMarket;
-  const inMarket = p => mf === 'all' || p.marketId === mf;
+  const inMarket = p => (mf === 'all' || p.marketId === mf) && propInPlatform(p);
   const all = proposals();
   const pending = all.filter(p => p.status === 'pending').sort((a, b) => (toDate(b.createdAt) || 0) - (toDate(a.createdAt) || 0));
   const history = all.filter(p => p.status !== 'pending').sort((a, b) => (toDate(b.decidedAt) || 0) - (toDate(a.decidedAt) || 0));
@@ -967,6 +1014,7 @@ function viewReviews(tab, marketFilter){
 
 // ─────────────────────── Actions ───────────────────────
 window.setRange = v => { S.days = +v; lsSet('mkt.days', v); render(); };
+window.setPlatform = v => { S.platform = v; lsSet('mkt.platform', v); S.campSel = new Set(); render(); };
 window.setReviewMarket = v => { S.reviewMarket = v; render(); };
 window.setCampMarket = v => { S.campMarket = v; S.campSel = new Set(); render(); };
 window.setCampOne = v => { S.campSel = new Set(v ? [v] : []); render(); };
@@ -1038,7 +1086,7 @@ function loadSample(){
     { id:'il', name:'Israel', subtitle:'Number porting · Israelis abroad & olim from the US/Canada', flags:['🇮🇱'],
       language:'Hebrew & English', currency:'ILS', usdRate:0.27,
       tracking:{ status:'not_recording', lastConversion:'2026-08-14',
-        note:'The site never sends the purchase event, and Tag Manager is skipped on iPhones and iPads. Nothing new launches until "Purchase (GAds)" shows Recording.' } },
+        note:'The site never sends the purchase event, and Tag Manager is skipped on iPhones and iPads. The Meta Pixel only sends PageView (no Purchase or Lead). Nothing new launches until "Purchase (GAds)" shows Recording.' } },
     { id:'br', name:'Brazil', subtitle:'Brazilians abroad · calls and numbers', flags:['🇧🇷'],
       language:'Portuguese & English', currency:'USD', usdRate:1,
       tracking:{ status:'check', note:'Uses the same Tag Manager container as Israel, so it has the same problem; the same site fix repairs it. Confirm after the fix.' } },
@@ -1058,11 +1106,17 @@ function loadSample(){
     ['br','calls','Calls to Brazil','Search',           25, 0.90, .060, .080, .20, 0  ],
     ['br','brand','Brand','Search',                      8, 0.40, .220, .140, .25, 0  ],
     ['br','pmax','Performance Max','Performance Max',   30, 0.50, .011, .025, .30, -.1],
+    // Meta (sample until the Meta sync runs)
+    ['il','meta-reloc','Relocation – Israelis abroad','Leads',  60, 1.8, .011, .045, .85, .10, 'ENABLED', 'meta'],
+    ['il','meta-aliyah','Aliyah – US/CA olim','Leads',          40, 2.2, .009, .040, .85, .05, 'ENABLED', 'meta'],
+    ['il','meta-rmkt','Remarketing – site visitors','Sales',    25, 1.2, .014, .060, .40, 0,   'ENABLED', 'meta'],
+    ['br','meta-keep','Brazilians abroad – keep your number','Leads', 20, 0.35, .013, .040, .80, .10, 'ENABLED', 'meta'],
+    ['br','meta-calls','Calls to Brazil','Sales',               15, 0.30, .012, .050, .20, 0,   'ENABLED', 'meta'],
   ];
   const orderValue = { il: [26, 92], br: [8, 25] };    // first order, account currency
   const leadValue = { il: 174, br: 40 };                // ≈ 40% close rate × lifetime value
   const DAYS = 182, start = addDays(today0(), -DAYS), rows = [];
-  S.campaigns = defs.map(([marketId, key, label, type, budget, cpc, ctr, cvr, leadShare, trend, status = 'ENABLED']) => {
+  S.campaigns = defs.map(([marketId, key, label, type, budget, cpc, ctr, cvr, leadShare, trend, status = 'ENABLED', platform = 'google']) => {
     const id = `${marketId}-${key}`;
     if (status === 'ENABLED') for (let i = 0; i < DAYS; i++) {
       const d = addDays(start, i), wk = [5, 6].includes(d.getDay()) ? .9 : 1.03;
@@ -1076,7 +1130,7 @@ function loadSample(){
       const value = +(purchases * (lo + rnd() * (hi - lo)) + leads * leadValue[marketId]).toFixed(2);
       rows.push({ campaignId:id, marketId, date: iso(d), impressions, clicks, cost, conversions, leads, purchases, value });
     }
-    return { id, marketId, type, name: `${marketId === 'il' ? 'IL' : 'BR'} · ${label}`, status, dailyBudget: budget };
+    return { id, marketId, platform, type, name: `${marketId === 'il' ? 'IL' : 'BR'} · ${label}`, status, dailyBudget: budget };
   });
   indexStats(rows);
 
@@ -1111,6 +1165,11 @@ function loadSample(){
       change:{ label:'Daily budget', from:ils(74), to:ils(95) },
       rationale:'This campaign reaches the highest-intent audience and runs out of budget before the US evening, when Israelis abroad search most. Its cost per conversion stays close to the market average despite pricier US clicks, so more budget should buy more of the same leads.',
       impact:'+20–25% callback leads from Israelis abroad' },
+    { id:'p-208', marketId:'il', campaignId:'il-meta-reloc', type:'budget_increase', level:'approval', source:'Weekly review', createdAt:hrs(6), status:'pending',
+      title:'Raise budget on Meta – Relocation (Israelis abroad)',
+      change:{ label:'Daily budget', from:ils(60), to:ils(80) },
+      rationale:'Meta lead ads for Israelis abroad are bringing callback leads at a lower cost than Google Search in the same market, and the campaign spends its full budget every day. Note that Meta only sees leads submitted in its own forms: the Pixel on the site sends no Lead or Purchase events yet.',
+      impact:'+15–20 callback leads / month' },
     { id:'p-206', marketId:'br', campaignId:'br-calls', type:'budget_decrease', level:'auto_limit', source:'Daily rules', createdAt:hrs(5), status:'pending',
       title:'Trim Calls to Brazil budget by 15%',
       change:{ label:'Daily budget', from:usd(25), to:usd(21) },
