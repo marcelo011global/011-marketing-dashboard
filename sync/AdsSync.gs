@@ -141,7 +141,7 @@ function syncMarket_(m, start, end) {
 /** Last day with a recorded purchase in the past year → recording / not_recording. */
 function trackingStatus_(cid) {
   var rows = gaql_(cid,
-    "SELECT segments.date, metrics.conversions FROM campaign " +
+    "SELECT segments.date, segments.conversion_action_category, metrics.conversions FROM campaign " +
     "WHERE segments.date BETWEEN '" + ymd_(addDays_(new Date(), -365)) + "' AND '" + ymd_(new Date()) + "' " +
     "AND segments.conversion_action_category = 'PURCHASE' AND metrics.conversions > 0");
   var last = rows.reduce(function (acc, r) { return r.segments.date > acc ? r.segments.date : acc; }, '');
