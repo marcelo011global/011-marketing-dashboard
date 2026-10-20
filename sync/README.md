@@ -39,7 +39,7 @@ The script runs under the existing Firebase project `telecom-deals-f155b`.
    enter the project number from step 2.
 5. **Project Settings → Script properties**: add `DEVELOPER_TOKEN` with the token from step 1.
 6. The account IDs are already in `CONFIG`: manager 011Global (MCC) 624-832-7649,
-   Israel 243-887-6474, Brazil 122-027-9929.
+   Israel 243-887-6474, Brazil 122-027-9929, VNUMBER 999-677-4190.
 
 ## 4. Run it
 1. Run `testConnection` and approve the permissions prompt. The log should show
@@ -49,7 +49,7 @@ The script runs under the existing Firebase project `telecom-deals-f155b`.
    New York time, refreshing the last 14 days.
 
 ## What it writes
-- `mkt_markets/{il|br}` — name, account currency, USD rate, tracking status
+- `mkt_markets/{il|br|vn}` — brand, name, account currency, USD rate, tracking status
   (`recording` if a purchase was recorded in the last 3 days, else `not_recording`
   with the last date seen)
 - `mkt_campaigns/{market}-{campaignId}` — name, type, status, daily budget

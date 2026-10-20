@@ -7,7 +7,9 @@ Israel and Brazil markets. Four sections:
 1. **Performance** — campaigns and conversions grouped by **market**. Two markets:
    **Israel** (number porting, per the strategy doc — Israelis abroad and US/Canadian
    olim, 7 campaigns + legacy Performance Max, account in ILS) and **Brazil**
-   (placeholder campaigns until it has a strategy, USD). Overview of all
+   (placeholder campaigns until it has a strategy, USD), plus **VNUMBER**
+   (separate brand, Google Ads 999-677-4190, USD). Markets carry a `brand`
+   ('011global' default | 'vnumber'); the top-bar brand filter scopes every view. Overview of all
    markets plus a detail page per market (daily spend/conversions, conversions
    by action, campaign table, pending proposals).
 2. **Campaigns** — spend, clicks and conversions charts for all campaigns, or
@@ -65,7 +67,7 @@ totals, Campaigns page across markets) is converted to USD with `usdRate`
   "Sample data" to "Live".
 
 ## Firestore Collections (written by the backend unless noted)
-- `mkt_markets/{id}` — {name, subtitle, flags:[emoji], language, currency ('ILS'|'USD'…, the Google Ads account currency), usdRate (USD per 1 unit, for cross-market totals), tracking:{status ('recording'|'not_recording'|'check'), lastConversion 'YYYY-MM-DD', note}}
+- `mkt_markets/{id}` — {name, brand ('011global'|'vnumber', missing = 011 Global), subtitle, flags:[emoji], language, currency ('ILS'|'USD'…, the Google Ads account currency), usdRate (USD per 1 unit, for cross-market totals), tracking:{status ('recording'|'not_recording'|'check'), lastConversion 'YYYY-MM-DD', note}}
 - `mkt_campaigns/{id}` — {marketId, platform ('google'|'meta'), name, type, status (ENABLED|PAUSED), dailyBudget, currency? (overrides the market's), googleAdsId | metaId}
 - `mkt_dailyStats/{campaignId_date}` — {campaignId, marketId, platform, date 'YYYY-MM-DD', impressions, clicks, cost, conversions, leads (callback form), purchases, value} — cost/value in the market's currency
 - `mkt_proposals/{id}` — {marketId, campaignId, type, level (approval|auto_limit), source, title, rationale, impact, change:{label,from,to}, keywords[], creatives[], createdAt, status (pending|approved|rejected|applied)}.

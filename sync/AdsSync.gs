@@ -22,12 +22,14 @@ var CONFIG = {
   // Manager account "011Global (MCC)" 624-832-7649, which the developer token belongs to.
   LOGIN_CUSTOMER_ID: '6248327649',
   FIRESTORE: 'projects/telecom-deals-f155b/databases/(default)/documents',
-  // Google Ads account per market, digits only (no dashes).
+  // Google Ads account per market, digits only (no dashes). brand: '011global' | 'vnumber'.
   MARKETS: [
-    { id: 'il', customerId: '2438876474', name: 'Israel', flags: ['🇮🇱'],
+    { id: 'il', customerId: '2438876474', brand: '011global', name: 'Israel', flags: ['🇮🇱'],
       subtitle: 'Number porting · Israelis abroad & olim from the US/Canada', language: 'Hebrew & English' },
-    { id: 'br', customerId: '1220279929', name: 'Brazil', flags: ['🇧🇷'],
+    { id: 'br', customerId: '1220279929', brand: '011global', name: 'Brazil', flags: ['🇧🇷'],
       subtitle: 'Brazilians abroad · calls and numbers', language: 'Portuguese & English' },
+    { id: 'vn', customerId: '9996774190', brand: 'vnumber', name: 'VNUMBER', flags: ['🌐'],
+      subtitle: 'VNUMBER brand · all campaigns', language: 'English' },
   ],
   // USD per 1 unit of account currency, for cross-market totals on the overview.
   USD_RATES: { USD: 1, ILS: 0.27, BRL: 0.18, EUR: 1.08 },
@@ -129,7 +131,7 @@ function syncMarket_(m, start, end) {
     }));
   });
   writes.push(upsert_('mkt_markets/' + m.id, {
-    name: m.name, subtitle: m.subtitle, flags: m.flags, language: m.language,
+    name: m.name, brand: m.brand, subtitle: m.subtitle, flags: m.flags, language: m.language,
     currency: currency, usdRate: CONFIG.USD_RATES[currency] || 1,
     tracking: trackingStatus_(cid),
     syncedAt: new Date().toISOString(),
