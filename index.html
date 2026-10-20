@@ -104,6 +104,10 @@ th{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;le
 td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
 th:first-child,td:first-child{text-align:left;}
 tr:last-child td{border-bottom:none;}
+tfoot td{font-weight:700;background:#FBFBFA;border-top:2px solid var(--border);border-bottom:none;}
+.custom-range{display:none;align-items:center;gap:4px;font-size:12px;color:var(--muted);}
+.custom-range.on{display:inline-flex;}
+.custom-range input{padding:5px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;color:var(--dark);background:var(--white);}
 tr.link{cursor:pointer;}
 tr.link:hover td{background:#FCFBF9;}
 tr.sel td{background:var(--orange-light);}
@@ -283,7 +287,13 @@ h1 .bchip{font-size:12px;vertical-align:4px;}
         <option value="7">Last 7 days</option>
         <option value="30">Last 30 days</option>
         <option value="90">Last 90 days</option>
+        <option value="mtd">This month</option>
+        <option value="lastmonth">Last month</option>
+        <option value="custom">Custom range…</option>
       </select>
+      <span id="custom-range" class="custom-range">
+        <input type="date" id="range-from" onchange="setCustom()" aria-label="From">–<input type="date" id="range-to" onchange="setCustom()" aria-label="To">
+      </span>
       <span class="user" id="user-display"></span>
       <button class="btn ghost" onclick="signOut()">Sign out</button>
     </div>
@@ -328,7 +338,10 @@ const S = {
   proposalsBase: [],          // sample proposals (live mode: empty, all come from Firestore)
   proposalDocs: new Map(),    // Firestore docs: full proposals (live) or decisions only (sample)
   reviews: [], activityBase: [], activityDocs: [],
-  days: [7,30,90].includes(+lsGet('mkt.days')) ? +lsGet('mkt.days') : 30,
+  // Date range: '7' | '30' | '90' (last N days) | 'mtd' | 'lastmonth' | 'custom' (from/to).
+  range: ['7','30','90','mtd','lastmonth','custom'].includes(lsGet('mkt.range')) ? lsGet('mkt.range')
+    : ['7','30','90'].includes(lsGet('mkt.days')) ? lsGet('mkt.days') : '30',
+  from: lsGet('mkt.from') || '', to: lsGet('mkt.to') || '',
   platform: ['all','google','meta'].includes(lsGet('mkt.platform')) ? lsGet('mkt.platform') : 'all',
   brand: ['all','011global','vnumber'].includes(lsGet('mkt.brand')) ? lsGet('mkt.brand') : 'all',
   reviewMarket: 'all',
@@ -376,7 +389,7 @@ function enterApp(user){
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-display').textContent = user.displayName || user.email;
-  document.getElementById('range').value = String(S.days);
+  syncRangeControls();
   document.getElementById('platform').value = S.platform;
   document.getElementById('brand').value = S.brand;
   loadData();
@@ -423,7 +436,7 @@ async function loadLive(marketSnap){
   S.markets = marketSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   const [campSnap, statSnap, revSnap] = await Promise.all([
     getDocs(collection(db, 'mkt_campaigns')),
-    getDocs(query(collection(db, 'mkt_dailyStats'), where('date', '>=', iso(addDays(today0(), -181))))),
+    getDocs(query(collection(db, 'mkt_dailyStats'), where('date', '>=', DATA_START()))),
     getDocs(query(collection(db, 'mkt_reviews'), orderBy('weekOf', 'desc'), limit(12))),
   ]);
   S.campaigns = campSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -466,9 +479,24 @@ function activity(){
 }
 
 // ─────────────────────── Metrics ───────────────────────
+// Data runs through yesterday. Live mode loads a year of daily stats, so custom
+// ranges (and their prior-period comparison) can reach back that far.
+const DATA_START = () => iso(addDays(today0(), -366));
+function rangeOf(){
+  const y = addDays(today0(), -1), t = today0();
+  if (S.range === 'mtd') return { start: iso(new Date(y.getFullYear(), y.getMonth(), 1)), end: iso(y) };
+  if (S.range === 'lastmonth') return { start: iso(new Date(t.getFullYear(), t.getMonth() - 1, 1)), end: iso(new Date(t.getFullYear(), t.getMonth(), 0)) };
+  if (S.range === 'custom' && S.from && S.to) return S.from <= S.to ? { start: S.from, end: S.to } : { start: S.to, end: S.from };
+  const n = +S.range || 30;
+  return { start: iso(addDays(y, -(n - 1))), end: iso(y) };
+}
+const spanDays = p => Math.round((new Date(p.end + 'T00:00:00') - new Date(p.start + 'T00:00:00')) / 864e5) + 1;
+// offset 0 = the selected range; 1 = the same number of days just before it.
 function period(offset){
-  const end = addDays(today0(), -1 - S.days * offset);
-  return { start: iso(addDays(end, -(S.days - 1))), end: iso(end) };
+  const p = rangeOf();
+  if (!offset) return p;
+  const end = addDays(new Date(p.start + 'T00:00:00'), -1);
+  return { start: iso(addDays(end, -(spanDays(p) - 1))), end: iso(end) };
 }
 function datesIn({ start, end }){
   const out = []; let d = new Date(start + 'T00:00:00');
@@ -619,7 +647,7 @@ function sparkline(values){
 // ─────────────────────── Views ───────────────────────
 function kpiRow(A, B, list = KPIS){
   return `<div class="kpis">${list.map(k => `<div class="card kpi"><div class="lbl">${k.label}</div>
-    <div class="val">${k.f(M[k.key](A), A.cur)}</div>${delta(M[k.key](A), M[k.key](B), k.good)} <span class="delta vs">vs prior ${S.days}d</span></div>`).join('')}</div>`;
+    <div class="val">${k.f(M[k.key](A), A.cur)}</div>${delta(M[k.key](A), M[k.key](B), k.good)} <span class="delta vs">vs prior ${spanDays(period(1))}d</span></div>`).join('')}</div>`;
 }
 const TRACK = {
   recording: ['ok', '✓', 'Purchases recording'],
@@ -716,6 +744,10 @@ function viewMarket(id){
       <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
       <td>${fmt.money(c.dailyBudget, a.cur)}</td><td>${fmt.money(a.cost, a.cur)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
       <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a), a.cur)}</td><td>${fmt.x(M.roas(a))}</td></tr>`).join('')}</tbody>
+    ${campRows.length > 1 ? (T => `<tfoot><tr><td>Total · ${campRows.length} campaigns${campRows.some(r => r.a.cur !== T.cur) ? ` (in ${esc(T.cur)})` : ''}</td><td></td><td></td>
+      <td>${fmt.money(campRows.filter(r => r.c.status === 'ENABLED' && r.a.cur === T.cur).reduce((s, r) => s + (+r.c.dailyBudget || 0), 0), T.cur)}</td>
+      <td>${fmt.money(T.cost, T.cur)}</td><td>${fmt.int(T.clicks)}</td><td>${fmt.pct(M.ctr(T))}</td>
+      <td>${fmt.int(T.conversions)}</td><td>${fmt.money2(M.cpa(T), T.cur)}</td><td>${fmt.x(M.roas(T))}</td></tr></tfoot>`)(aggFor(idsOf(campRows.map(r => r.c)), cur)) : ''}
   </table></div>
   ${hidden ? `<div class="hint">${hidden} campaign${hidden === 1 ? '' : 's'} with no activity in this period not shown.</div>` : ''}
   <h2 class="sec">Waiting for review</h2>
@@ -763,7 +795,9 @@ function viewCampaigns(){
   const ids = idsOf(sel.length ? sel : list);
   S.chartIds = ids;
   const A = aggFor(ids, cur), B = aggFor(ids, prev);
-  const rows = list.map(c => ({ c, a: aggFor([c.id], cur) })).sort((x, y) => y.a.cost - x.a.cost);
+  // One currency for the whole table (USD when markets mix), so rows sort and add up to the total.
+  const tcur = curOf(idsOf(list));
+  const rows = list.map(c => ({ c, a: aggFor([c.id], cur, tcur) })).sort((x, y) => y.a.cost - x.a.cost);
   const scope = sel.length === 1 ? sel[0].name
     : sel.length ? `${sel.length} selected campaigns`
     : mf === 'all' ? `All ${list.length} campaigns` : `All campaigns in ${marketById(mf)?.name || mf}`;
@@ -785,7 +819,7 @@ function viewCampaigns(){
   </div>
   ${kpiRow(A, B, [KPI.cost, KPI.clicks, KPI.conversions, KPI.cpa, KPI.ctr, KPI.roas])}
   <div class="charts" style="margin-top:12px">${chart('cost', 'Spend')}${chart('clicks', 'Clicks')}${chart('conversions', 'Conversions')}</div>
-  <h2 class="sec">Campaigns</h2>
+  <h2 class="sec">Campaigns${tcur !== A.cur ? ` <span class="count-muted">figures in ${esc(tcur)}</span>` : ''}</h2>
   <div class="table-wrap"><table>
     <thead><tr><th style="width:36px"></th><th style="text-align:left">Campaign</th><th>Status</th><th>Spend</th><th>Clicks</th><th>CTR</th><th>Conversions</th><th>Cost / conv.</th><th>ROAS</th></tr></thead>
     <tbody>${rows.map(({ c, a }) => { const m = marketById(c.marketId), on = S.campSel.has(c.id); return `<tr class="link${on ? ' sel' : ''}" onclick="toggleCamp('${esc(c.id)}')">
@@ -794,6 +828,9 @@ function viewCampaigns(){
       <td><span class="status ${c.status === 'ENABLED' ? 'enabled' : 'paused'}">${c.status === 'ENABLED' ? 'Active' : 'Paused'}</span></td>
       <td>${fmt.money(a.cost, a.cur)}</td><td>${fmt.int(a.clicks)}</td><td>${fmt.pct(M.ctr(a))}</td>
       <td>${fmt.int(a.conversions)}</td><td>${fmt.money2(M.cpa(a), a.cur)}</td><td>${fmt.x(M.roas(a))}</td></tr>`; }).join('')}</tbody>
+    ${rows.length > 1 ? (T => `<tfoot><tr><td></td><td style="text-align:left">Total · ${rows.length} campaigns</td><td></td>
+      <td>${fmt.money(T.cost, T.cur)}</td><td>${fmt.int(T.clicks)}</td><td>${fmt.pct(M.ctr(T))}</td>
+      <td>${fmt.int(T.conversions)}</td><td>${fmt.money2(M.cpa(T), T.cur)}</td><td>${fmt.x(M.roas(T))}</td></tr></tfoot>`)(aggFor(idsOf(list), cur, tcur)) : ''}
   </table></div>
   ${inMarket.length > list.length ? `<div class="hint">${inMarket.length - list.length} campaign${inMarket.length - list.length === 1 ? '' : 's'} with no activity in this period not shown.</div>` : ''}`;
 }
@@ -1031,7 +1068,22 @@ function viewReviews(tab, marketFilter){
 }
 
 // ─────────────────────── Actions ───────────────────────
-window.setRange = v => { S.days = +v; lsSet('mkt.days', v); render(); };
+function syncRangeControls(){
+  document.getElementById('range').value = S.range;
+  const from = document.getElementById('range-from'), to = document.getElementById('range-to'), p = rangeOf();
+  document.getElementById('custom-range').classList.toggle('on', S.range === 'custom');
+  from.value = p.start; to.value = p.end;
+  from.min = to.min = DATA_START(); from.max = to.max = iso(addDays(today0(), -1));
+}
+window.setRange = v => {
+  if (v === 'custom' && !(S.from && S.to)) { const p = rangeOf(); S.from = p.start; S.to = p.end; lsSet('mkt.from', S.from); lsSet('mkt.to', S.to); }
+  S.range = v; lsSet('mkt.range', v); syncRangeControls(); render();
+};
+window.setCustom = () => {
+  const from = document.getElementById('range-from').value, to = document.getElementById('range-to').value;
+  if (!from || !to) return;
+  S.from = from; S.to = to; lsSet('mkt.from', from); lsSet('mkt.to', to); syncRangeControls(); render();
+};
 window.setBrand = v => {
   S.brand = v; lsSet('mkt.brand', v); S.campSel = new Set();
   if (S.campMarket !== 'all' && !inBrand(marketById(S.campMarket))) S.campMarket = 'all';
