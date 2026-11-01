@@ -48,21 +48,37 @@ file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global: `logo.png` (trimm
   write `mkt_proposals` / `mkt_reviews` / `mkt_activity`; this site only reads them
   and records decisions.
 
-## Sales page (`sales.html`)
-Package Profitability dashboard (monthly retail package sales: subscribers, minutes,
-charged, cost, gross profit by market / type / package, sleeping packages, Vnumber
-split). Separate file with the same Firebase login; linked as "Sales" in the top bar.
-- Data: `mkt_sales/{YYYY-MM}` = {month, rows (JSON string of
-  [market, type, package, subscribers, minutes, charged, cost]), rowCount, source,
-  uploadedBy, uploadedAt}; `mkt_salesMeta/last` = {by, at, file, from, to}.
-- Filled by the page's **Upload monthly report** button: reads the
-  `PackagesProfitability_Active_Sl` tab of the xlsx in the browser (SheetJS) and
-  overwrites every month in the file. Rules: Bglobal = BGlobal, RenewalCombined*
-  count as Monthly, Vnumber = package names starting `Vnumber_`, sleeping =
-  subscribers with zero minutes.
-- Sales figures must never be committed (`.gitignore` blocks `*.xlsx` and
-  `sales-preview.json`). Local preview: `sales.html?preview` reads a local
-  `sales-preview.json` ({d,m,t,p,r} format) and keeps uploads in memory.
+## Sales and VNUMBER pages (`sales.html`, `vnumber.html`)
+Two pages outside the hash router, sharing `sales.css` and `sales-data.js`
+(Firebase login, workbook reader, Firestore load/save, page shell with the
+**Upload monthly report** button). Linked as "Sales" and "VNUMBER" in every top bar.
+- **Sales** — Package Profitability dashboard (monthly retail package sales:
+  subscribers, minutes, charged, cost, gross profit by market / type / package,
+  sleeping packages, Vnumber split).
+- **VNUMBER** — the virtual-number business: revenue (new-customer vs recurring),
+  share of company sales, subscribers, new vs churned, churn rate, marketing spend,
+  CPA, first-month income per new customer, margin LTV by DID country, LTV ÷ CPA,
+  payback, VNUMBER packages and a month-by-month table. Recalculates the sheet's
+  formulas (recurring = revenue − monthly sales; churn = prev subs + new − subs;
+  CPA = spend ÷ new subs). "Share of company sales" = VNUMBER ÷ all packages
+  charged; the sheet's "% of 011 Revenue" is VNUMBER ÷ the rest of 011 (shown too).
+- Data (Firestore, never in the repo):
+  - `mkt_sales/{YYYY-MM}` = {month, rows (JSON of [market, type, package,
+    subscribers, minutes, charged, cost]), rowCount, source, uploadedBy, uploadedAt}
+  - `mkt_vnumber/summary` = {months: JSON {YYYY-MM: {rev, newSales, spend, subs, newSubs}}}
+    from the "Vnumber Summary" tab (row 1 years, row 2 months, labels in column A)
+  - `mkt_vnumber/ltv` = {months: JSON [YYYY-MM], rows: JSON {country: [ltv]}, total}
+    from the "LTV" tab (headers are month names without years; the last column
+    is taken as the newest such month on or before the newest month in the file)
+  - `mkt_salesMeta/last` = {by, at, file, from, to, summary, ltv}
+- Upload: each tab found in the xlsx is saved; months in the package tab replace
+  those months only (a one-month file adds one month); the summary and LTV docs are
+  replaced whole when their tab is present. Rules: Bglobal = BGlobal,
+  RenewalCombined* count as Monthly, Vnumber = package names starting `Vnumber_`,
+  sleeping = subscribers with zero minutes.
+- Local preview: `sales.html?preview` / `vnumber.html?preview` read a gitignored
+  `test-report.xlsx` placed next to them; uploads stay in memory.
+- Planned: a sales API sync (like `sync/AdsSync.gs`) writing the same collections.
 
 ## Platforms
 Every campaign has `platform` ('google' | 'meta'; missing = 'google'). A top-bar

@@ -5,122 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>011 Global — Sales</title>
 <link rel="icon" type="image/png" href="favicon.png">
-<style>
-/* Sales page of the 011 Global marketing dashboard. Layout: top bar → filters → KPI strip → two trend charts → market + sleeping panels → full package ledger */
-:root{
-  --bg:#F7F7F5; --surface:#FFFFFF; --sunk:#F1F1EE; --line:#E5E5E5; --line-strong:#D4D4D0;
-  --fg:#1A1A1A; --fg2:#555555; --fg3:#888888;
-  --brand:#EE7805; --brand-ink:#C46204; --brand-soft:#FDF0E3;
-  --slate:#3A6EA5;
-  --good:#1E7F4F; --good-soft:#E3F3EA; --bad:#B42318; --bad-soft:#FBE7E4; --warn:#9A6200; --warn-soft:#FCF0D6; --sleep:#5A5F86; --sleep-soft:#E9EAF4;
-  --c-israel:#3A6EA5; --c-brazil:#EE7805; --c-hispanic:#2A9D8F; --c-bglobal:#9B5DE5; --c-asia:#C2185B;
-  --display:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif; --body:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif; --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
-}
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--body);margin:0}
-.wrap{max-width:1320px;margin:0 auto;padding-inline:clamp(16px,3vw,32px);padding-block:20px 48px;display:grid;gap:20px}
-header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
-.brand{display:flex;align-items:center;gap:10px;font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--brand-ink)}
-.brand i{width:10px;height:10px;border-radius:50%;background:var(--brand);display:inline-block}
-h1{font:600 clamp(22px,2.6vw,30px)/1.15 var(--display);margin:6px 0 0;text-wrap:balance;letter-spacing:-.01em}
-.sub{color:var(--fg2);margin:4px 0 0}
-.filters{position:static;background:var(--bg);padding-block:10px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
-.f{display:flex;align-items:center;gap:8px}
-.f label,.lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg3);font-weight:500}
-select,input[type=search]{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:6px 10px;min-height:34px}
-select:focus-visible,input:focus-visible,button:focus-visible,th:focus-visible,tr:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{font:500 13px/1 var(--body);border:1px solid var(--line-strong);background:var(--surface);color:var(--fg2);border-radius:999px;padding:7px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
-.chip .dot{width:8px;height:8px;border-radius:50%}
-.chip[aria-pressed="true"]{color:var(--fg);border-color:var(--fg2);background:var(--sunk)}
-.chip[aria-pressed="false"]{opacity:.55}
-.chip[aria-pressed="false"] .dot{background:transparent!important;outline:1.5px solid var(--fg3)}
-.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
-.seg button{font:500 12px/1 var(--body);background:var(--surface);color:var(--fg2);border:0;padding:8px 11px;cursor:pointer}
-.seg button+button{border-left:1px solid var(--line-strong)}
-.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.kpi{background:var(--surface);padding:14px 16px;display:grid;gap:4px;min-width:0}
-.kpi .v{font:500 clamp(20px,2.2vw,26px)/1.1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.kpi.lead .v{color:var(--brand-ink)}
-.delta{font:500 12px/1.2 var(--mono);display:flex;gap:6px;align-items:center;color:var(--fg3)}
-.up{color:var(--good)}.down{color:var(--bad)}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:20px}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:grid;gap:12px;min-width:0;align-content:start}
-.ph{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
-h2{font:600 15px/1.3 var(--display);margin:0}
-.note{color:var(--fg3);font-size:12px;margin:0}
-.chart{position:relative;height:280px}
-.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--fg2)}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
-.legend i.ln{height:3px;width:14px;border-radius:2px}
-.tbl{overflow-x:auto;min-width:0}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th,td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
-th:first-child,td:first-child{text-align:left}
-th{font:500 11px/1.2 var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--fg3);position:sticky;top:0;background:var(--surface)}
-th.s{cursor:pointer;user-select:none}
-th.s[aria-sort="descending"]::after{content:" ↓"}th.s[aria-sort="ascending"]::after{content:" ↑"}
-td{font-family:var(--mono);font-size:13px}
-td.name{font-family:var(--body);font-size:13px;max-width:320px;overflow:hidden;text-overflow:ellipsis}
-td .mk{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
-tbody tr.click{cursor:pointer}
-tbody tr.click:hover{background:var(--sunk)}
-tbody tr.sel{background:var(--brand-soft)}
-tfoot td{font-weight:500;border-top:1px solid var(--line-strong);border-bottom:0}
-.pill{display:inline-block;font:500 11px/1 var(--body);padding:4px 7px;border-radius:999px;margin-left:4px}
-.p-loss{background:var(--bad-soft);color:var(--bad)}.p-sleep{background:var(--sleep-soft);color:var(--sleep)}.p-low{background:var(--warn-soft);color:var(--warn)}.p-new{background:var(--good-soft);color:var(--good)}
-.bar{display:inline-block;height:6px;border-radius:3px;background:var(--brand);vertical-align:middle;margin-left:8px;opacity:.75}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.stat{display:grid;gap:2px;min-width:0}
-.stat b{font:500 20px/1.1 var(--mono);color:var(--sleep)}
-.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.tools input{min-width:0;width:min(260px,100%)}
-.more{font:500 13px var(--body);background:none;border:1px solid var(--line-strong);color:var(--fg2);border-radius:8px;padding:7px 12px;cursor:pointer;justify-self:start}
-.detail{border:1px solid var(--line-strong);border-radius:10px;padding:12px 14px;display:grid;gap:8px;background:var(--bg)}
-.detail .chart{height:200px}
-.x{background:none;border:0;color:var(--fg3);cursor:pointer;font-size:13px}
-.empty{color:var(--fg3);padding:16px;text-align:center}
-footer{color:var(--fg3);font-size:12px}
-.topbar{background:var(--surface);border-bottom:1px solid var(--line);padding:0 1.5rem;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;flex-wrap:wrap}
-.topbar-left,.topbar-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.logo{display:flex;align-items:center}.logo-img{height:30px;width:auto;display:block}
-.app-name{font-size:12px;font-weight:700;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;padding-left:10px;margin-right:10px;border-left:1px solid var(--line)}
-.nav-btn{padding:6px 11px;border-radius:6px;font-size:13px;font-weight:500;color:var(--fg3);text-decoration:none}
-.nav-btn:hover{color:var(--fg);background:var(--bg)}
-.nav-btn.active{color:var(--brand);background:var(--brand-soft)}
-.user{font-size:12.5px;color:var(--fg3)}
-.btn{padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);font:600 12.5px var(--body);cursor:pointer;color:var(--fg)}
-.btn:hover{border-color:var(--fg3)}
-.btn.ghost{border-color:transparent;background:transparent;color:var(--fg3)}
-.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
-.btn.primary:hover{background:var(--brand-ink)}
-.btn:disabled{opacity:.5;cursor:wait}
-.upload{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:flex-end}
-.upload .note{max-width:340px;text-align:right}
-.gate{max-width:520px;margin:12vh auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;display:grid;gap:12px;justify-items:start}
-.gate h1{font-size:20px}
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--fg);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:200;max-width:90vw}
-.nodata{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center;padding:16px;background:var(--surface);color:var(--fg2)}
-[hidden]{display:none!important}
-.sstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
-.sstats .stat b{color:var(--fg)}
-.movers{display:grid;grid-template-columns:1fr 1fr;gap:16px;min-width:0}
-.movers h3{font:500 11px/1.2 var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--fg3);margin:0 0 6px}
-.movers ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
-.movers li{display:flex;justify-content:space-between;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:13px;min-width:0}
-.movers li:hover{background:var(--sunk)}
-.movers li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.movers li span:last-child{font-family:var(--mono);white-space:nowrap}
-@media (max-width:560px){.movers{grid-template-columns:1fr}}
-.reset{font:500 13px var(--body);background:var(--fg);color:var(--bg);border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
-.banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 14px;font-weight:500}
-.seg button:disabled,.chip:disabled{opacity:.35;cursor:not-allowed}
-@media (max-width:760px){.filters{position:static}}
-@media (max-width:560px){.stats{grid-template-columns:1fr 1fr}.chart{height:240px}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-</style>
+<link rel="stylesheet" href="sales.css">
 </head>
 <body>
 
@@ -133,6 +18,7 @@ footer{color:var(--fg3);font-size:12px}
     <a class="nav-btn" href="index.html#/pages">Landing pages</a>
     <a class="nav-btn" href="index.html#/reviews">Reviews</a>
     <a class="nav-btn active" href="sales.html">Sales</a>
+    <a class="nav-btn" href="vnumber.html">VNUMBER</a>
   </div>
   <div class="topbar-right">
     <span class="user" id="user-display"></span>
@@ -480,139 +366,12 @@ render();
 <div id="toast" hidden></div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDocs, writeBatch, serverTimestamp, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-// Same Firebase project and login as index.html. Sales data lives in
-// mkt_sales/{YYYY-MM} (one document per month) and mkt_salesMeta/last; it is
-// never committed to the repo.
-const app = initializeApp({
-  apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
-  authDomain: "telecom-deals-f155b.firebaseapp.com",
-  projectId: "telecom-deals-f155b",
-  storageBucket: "telecom-deals-f155b.firebasestorage.app",
-  messagingSenderId: "182881118188",
-  appId: "1:182881118188:web:9d2f09995f7a1393f942c9"
-});
-const auth = getAuth(app), db = getFirestore(app);
-const ALLOWED = ['@011global.com','@011telecom.com'];
-const allowedEmail = e => ALLOWED.some(d => (e || '').toLowerCase().endsWith(d));
-// Local-only preview (?preview on localhost): no sign-in, data from a gitignored
-// sales-preview.json, uploads stay in memory.
-const LOCAL_PREVIEW = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('preview');
-const $ = id => document.getElementById(id);
-let toastT;
-const toast = m => { const el = $('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 5000); };
-const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const monthName = k => { const [y, m] = k.split('-'); return MN[+m - 1] + ' ' + y; };
-
-function gate(html){ $('app').hidden = true; const g = $('gate'); g.hidden = false; g.innerHTML = html; }
-
-// Rows per month: [market, type, package, subscribers, minutes, charged, cost]
-function toDATA(months){
-  const D = Object.keys(months).sort(), M = new Set(), T = new Set(['Monthly','Prepaid']), P = new Set();
-  for (const k of D) for (const r of months[k]) { M.add(r[0]); T.add(r[1]); P.add(r[2]); }
-  const m = [...M].sort(), t = [...T], p = [...P].sort();
-  const mi = new Map(m.map((v,i)=>[v,i])), ti = new Map(t.map((v,i)=>[v,i])), pi = new Map(p.map((v,i)=>[v,i]));
-  const rows = [];
-  D.forEach((k, di) => { for (const r of months[k]) rows.push([di, mi.get(r[0]), ti.get(r[1]), pi.get(r[2]), r[3], r[4], r[5], r[6]]); });
-  return { d: D, m, t, p, r: rows };
-}
-
-// Reads the report workbook. Same rules as before: Bglobal = BGlobal, both
-// renewal types count as Monthly.
-function parseWorkbook(buf){
-  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-  const name = wb.SheetNames.find(n => n.startsWith('PackagesProfitability'));
-  if (!name) throw new Error('This file has no PackagesProfitability tab. Upload the monthly Package Profitability report.');
-  const json = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: null });
-  const need = ['Date','Market','Type','Package Name','Subscribers','Minutes','Charged','Cost'];
-  const miss = need.filter(c => !json.length || !(c in json[0]));
-  if (miss.length) throw new Error('The PackagesProfitability tab is missing these columns: ' + miss.join(', ') + '.');
-  const months = {}, num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,]/g, '')); return isFinite(n) ? n : 0; };
-  for (const x of json) {
-    let d = x.Date; if (!d) continue;
-    if (!(d instanceof Date)) d = new Date(d);
-    if (isNaN(d)) continue;
-    d = new Date(d.getTime() + 12 * 3600e3);
-    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    let mk = String(x.Market ?? '').trim(); if (mk.toLowerCase() === 'bglobal') mk = 'BGlobal';
-    let ty = String(x.Type ?? '').trim(); if (ty.startsWith('Renewal')) ty = 'Monthly';
-    const pk = String(x['Package Name'] ?? '').trim();
-    if (!mk || !pk) continue;
-    (months[key] ||= []).push([mk, ty, pk, Math.round(num(x.Subscribers)), Math.round(num(x.Minutes)), Math.round(num(x.Charged) * 100) / 100, Math.round(num(x.Cost) * 100) / 100]);
-  }
-  if (!Object.keys(months).length) throw new Error('No rows with a date were found in the PackagesProfitability tab.');
-  return months;
-}
-window.__parseWorkbook = parseWorkbook;
-
-function start(DATA, meta){
-  $('gate').hidden = true; $('app').hidden = false;
-  const last = DATA.d[DATA.d.length - 1];
-  $('srcnote').textContent = meta ? `Data through ${monthName(last)} · uploaded ${meta.at ? meta.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}${meta.by ? ' by ' + meta.by : ''}` : `Data through ${monthName(last)}`;
-  window.startDashboard(DATA);
-}
-
-async function loadLive(){
-  const [snap, metaSnap] = await Promise.all([getDocs(collection(db, 'mkt_sales')), getDoc(doc(db, 'mkt_salesMeta', 'last')).catch(() => null)]);
-  const months = {};
-  snap.forEach(d => { if (/^\d{4}-\d{2}$/.test(d.id)) months[d.id] = JSON.parse(d.data().rows); });
-  const m = metaSnap && metaSnap.exists() ? metaSnap.data() : null;
-  return { months, meta: m ? { by: m.by, at: m.at?.toDate?.() } : null };
-}
-
-async function upload(file){
-  const btn = $('upload'); btn.disabled = true; btn.textContent = 'Reading…';
-  try {
-    const months = parseWorkbook(await file.arrayBuffer());
-    const keys = Object.keys(months).sort();
-    if (LOCAL_PREVIEW) { toast(`Read ${keys.length} months (local preview — not saved)`); start(toDATA(months), null); return; }
-    btn.textContent = 'Saving…';
-    const by = auth.currentUser?.displayName || auth.currentUser?.email || '';
-    for (let i = 0; i < keys.length; i += 400) {
-      const b = writeBatch(db);
-      keys.slice(i, i + 400).forEach(k => b.set(doc(db, 'mkt_sales', k), { month: k, rows: JSON.stringify(months[k]), rowCount: months[k].length, source: file.name, uploadedBy: by, uploadedAt: serverTimestamp() }));
-      await b.commit();
-    }
-    await setDoc(doc(db, 'mkt_salesMeta', 'last'), { by, at: serverTimestamp(), file: file.name, from: keys[0], to: keys[keys.length - 1] });
-    toast(`Saved ${keys.length} months, ${monthName(keys[0])} to ${monthName(keys[keys.length - 1])}. Reloading…`);
-    setTimeout(() => location.reload(), 1200);
-  } catch (e) {
-    console.error(e);
-    const denied = /permission|insufficient/i.test(e.message || '');
-    toast(denied ? 'Firestore refused the save. The security rules need to allow the mkt_sales and mkt_salesMeta collections.' : e.message);
-  } finally { btn.disabled = false; btn.textContent = 'Upload monthly report'; }
-}
-
-function wire(){
-  $('upload').onclick = () => $('file').click();
-  $('file').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) upload(f); };
-  $('signout').onclick = async () => { if (LOCAL_PREVIEW) { location.search = ''; return; } await signOut(auth); location.href = 'index.html'; };
-}
-
-function emptyState(){
-  gate(`<h1>Sales</h1><p>No sales report has been uploaded yet. Upload the monthly Package Profitability workbook (.xlsx) to fill this page. It includes the full history, so one upload covers every month.</p><button class="btn primary" type="button" id="upload2">Upload monthly report</button>`);
-  $('upload2').onclick = () => $('file').click();
-}
-
-wire();
-if (LOCAL_PREVIEW) {
-  $('user-display').textContent = 'Local preview';
-  fetch('sales-preview.json').then(r => r.ok ? r.json() : null).then(d => d ? start(d, null) : emptyState()).catch(emptyState);
-} else onAuthStateChanged(auth, async user => {
-  if (!user || !allowedEmail(user.email)) { gate(`<h1>Sign in to see sales</h1><p>Sales figures are for 011 Global and 011 Telecom staff. Sign in on the marketing dashboard, then come back here.</p><a class="btn primary" href="index.html">Go to sign in</a>`); return; }
-  $('user-display').textContent = user.displayName || user.email;
-  gate('<p>Loading sales…</p>');
-  try {
-    const { months, meta } = await loadLive();
-    if (!Object.keys(months).length) { emptyState(); return; }
-    start(toDATA(months), meta);
-  } catch (e) {
-    console.error(e);
-    gate(`<h1>Sales could not load</h1><p>${/permission|insufficient/i.test(e.message || '') ? 'Firestore refused access. The security rules need to allow signed-in staff to read the mkt_sales collection.' : 'Something went wrong while loading. Reload the page to try again.'}</p>`);
-  }
+import { initPage, toDATA } from './sales-data.js';
+initPage({
+  title: 'Sales',
+  emptyText: 'No sales report has been uploaded yet. Upload the monthly Package Profitability workbook (.xlsx) to fill this page. A file with the full history fills every month; a file with one month adds or replaces just that month.',
+  ready: d => Object.keys(d.sales || {}).length > 0,
+  render: d => window.startDashboard(toDATA(d.sales)),
 });
 </script>
 </body>

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>011 Global — VNUMBER</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="sales.css">
+<style>
+/* VNUMBER page: KPI groups → trend charts in pairs → LTV by country → packages → monthly table */
+.kgroup{display:grid;gap:8px}
+.kgroup>.lbl{padding-left:2px}
+.kpi .hint{font-size:11.5px;color:var(--fg3)}
+.flat{color:var(--fg3)}
+td.l{text-align:left;font-family:var(--body)}
+.spark{display:block}
+.p-good{background:var(--good-soft);color:var(--good)}
+.monthly th,.monthly td{padding:7px 9px}
+.monthly tbody tr:first-child td{font-weight:500}
+.mtbl{max-height:520px;overflow:auto}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <a class="logo" href="index.html#/performance"><img src="logo.png" alt="011 Global" class="logo-img"></a>
+    <span class="app-name">Marketing</span>
+    <a class="nav-btn" href="index.html#/performance">Markets</a>
+    <a class="nav-btn" href="index.html#/campaigns">Campaigns</a>
+    <a class="nav-btn" href="index.html#/pages">Landing pages</a>
+    <a class="nav-btn" href="index.html#/reviews">Reviews</a>
+    <a class="nav-btn" href="sales.html">Sales</a>
+    <a class="nav-btn active" href="vnumber.html">VNUMBER</a>
+  </div>
+  <div class="topbar-right">
+    <span class="user" id="user-display"></span>
+    <button class="btn ghost" type="button" id="signout">Sign out</button>
+  </div>
+</header>
+
+<div class="gate" id="gate" hidden></div>
+<input type="file" id="file" accept=".xlsx,.xls" hidden>
+
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div>
+      <div class="brand"><i></i>VNUMBER · Virtual numbers</div>
+      <h1>VNUMBER business</h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <div class="upload">
+      <p class="note" id="srcnote"></p>
+      <button class="btn primary" type="button" id="upload">Upload monthly report</button>
+    </div>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <div class="f"><label for="month">Month</label><select id="month"></select></div>
+    <div class="f"><label for="cmp">Compare to</label><select id="cmp"></select></div>
+    <div class="f"><span class="lbl">Charts</span><div class="seg" id="range" role="group" aria-label="Time range"><button type="button" data-r="12">12 mo</button><button type="button" data-r="24">24 mo</button><button type="button" data-r="999" aria-pressed="true">All</button></div></div>
+  </div>
+
+  <section class="kgroup" aria-label="Sales"><span class="lbl">Sales</span><div class="kpis" id="k-sales"></div></section>
+  <section class="kgroup" aria-label="Customers"><span class="lbl">Customers</span><div class="kpis" id="k-cust"></div></section>
+  <section class="kgroup" aria-label="Acquisition and value"><span class="lbl">Acquisition and value</span><div class="kpis" id="k-acq"></div></section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><h2>Revenue and marketing spend</h2><p class="note">Revenue split into first payments of new customers and recurring payments</p></div>
+      <div class="legend"><span><i style="background:var(--brand)"></i>New-customer sales</span><span><i style="background:var(--slate)"></i>Recurring</span><span><i class="ln" style="background:var(--fg)"></i>Marketing spend</span></div>
+      <div class="chart"><canvas id="c-rev" aria-label="Monthly revenue split into new-customer and recurring, with marketing spend"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>Active subscribers</h2><p class="note" id="n-subs"></p></div>
+      <div class="legend"><span><i class="ln" style="background:var(--slate)"></i>Active subscribers at month end</span></div>
+      <div class="chart"><canvas id="c-subs" aria-label="Active subscribers per month"></canvas></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><h2>New vs churned customers</h2><p class="note">Churned = last month's subscribers + new − this month's</p></div>
+      <div class="legend"><span><i style="background:var(--good)"></i>New</span><span><i style="background:var(--bad)"></i>Churned</span><span><i class="ln" style="background:var(--fg)"></i>Net change</span></div>
+      <div class="chart"><canvas id="c-flow" aria-label="New and churned customers per month"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>Cost and value per customer</h2><p class="note">CPA = marketing spend ÷ new subscribers</p></div>
+      <div class="legend"><span><i class="ln" style="background:var(--bad)"></i>CPA</span><span><i class="ln" style="background:var(--brand)"></i>First-month income per new customer</span><span><i class="ln" style="background:var(--c-hispanic)"></i>LTV (margin, all countries)</span></div>
+      <div class="chart"><canvas id="c-unit" aria-label="CPA, first-month income per new customer and LTV per month"></canvas></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><h2>Share of company sales</h2><p class="note">VNUMBER charged ÷ all 011 packages charged</p></div>
+      <div class="legend"><span><i class="ln" style="background:var(--brand)"></i>Share of all 011 sales</span><span><i class="ln" style="background:var(--fg3)"></i>Compared with the rest of 011 (the sheet's “% of 011 Revenue”)</span></div>
+      <div class="chart"><canvas id="c-share" aria-label="VNUMBER share of company sales per month"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>Monthly churn rate</h2><p class="note">Churned ÷ last month's subscribers</p></div>
+      <div class="legend"><span><i class="ln" style="background:var(--bad)"></i>Churn rate</span></div>
+      <div class="chart"><canvas id="c-churn" aria-label="Monthly churn rate"></canvas></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="ph"><h2>LTV by DID country</h2><p class="note" id="n-ltv"></p></div>
+    <div class="tbl"><table id="t-ltv"></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="ph"><h2>VNUMBER packages</h2><p class="note" id="n-pkg"></p></div>
+    <div class="tbl"><table id="t-pkg"></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="ph"><h2>Month by month</h2><p class="note">Newest first</p></div>
+    <div class="tbl mtbl"><table class="monthly" id="t-month"></table></div>
+  </section>
+
+  <footer>Sources: the monthly report's “Vnumber Summary” tab (revenue, first-month sales, marketing spend, subscribers, new subscribers), “LTV” tab (margin LTV by DID country) and package tab (packages named Vnumber_…, cost and company totals). Recurring = revenue − first-month sales. Churned = last month's subscribers + new − this month's. CPA = marketing spend ÷ new subscribers (all channels). Payback = CPA ÷ gross profit per subscriber per month.</footer>
+</div>
+
+<div id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+window.startVnumber=function(V){
+const $=s=>document.querySelector(s);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const ml=k=>{const[y,m]=k.split('-');return MN[+m-1]+' '+y};
+const mls=k=>{const[y,m]=k.split('-');return MN[+m-1]+' ’'+y.slice(2)};
+const prevKey=k=>{let[y,m]=k.split('-').map(Number);m--;if(!m){m=12;y--}return y+'-'+String(m).padStart(2,'0')};
+const ok=v=>v!=null&&isFinite(v);
+const fm=v=>ok(v)?(v<0?'−':'')+'$'+Math.round(Math.abs(v)).toLocaleString('en-US'):'–';
+const f2=v=>ok(v)?'$'+v.toFixed(2):'–';
+const fk=v=>Math.abs(v)>=1e3?'$'+(v/1e3).toFixed(0)+'k':'$'+v.toFixed(0);
+const fn=v=>ok(v)?Math.round(v).toLocaleString('en-US'):'–';
+const fp=v=>ok(v)?(v*100).toFixed(1)+'%':'–';
+const fx=v=>ok(v)?v.toFixed(1)+'×':'–';
+
+// ── Build one record per month ──
+const vnName=p=>p.startsWith('Vnumber_');
+const salesBy={};
+for(const[k,rows] of Object.entries(V.sales||{})){
+  const o={vnRev:0,vnCost:0,vnSubs:0,total:0,pk:new Map()};
+  for(const r of rows){o.total+=r[5];if(!vnName(r[2]))continue;o.vnRev+=r[5];o.vnCost+=r[6];o.vnSubs+=r[3];
+    let p=o.pk.get(r[2]);if(!p){p={name:r[2],mk:new Set(),subs:0,min:0,rev:0,cost:0};o.pk.set(r[2],p)}p.mk.add(r[0]);p.subs+=r[3];p.min+=r[4];p.rev+=r[5];p.cost+=r[6]}
+  if(o.vnRev||o.vnSubs)salesBy[k]=o;
+}
+const S=V.summary||{};
+const L=V.ltv;const ltvAt={};if(L&&L.total)L.months.forEach((k,i)=>{if(ok(L.total[i]))ltvAt[k]=L.total[i]});
+const keys=[...new Set([...Object.keys(S),...Object.keys(salesBy)])].sort();
+const X={};
+for(const k of keys){
+  const s=S[k]||{},b=salesBy[k]||null,p=X[prevKey(k)];
+  const x={k,rev:s.rev??b?.vnRev??null,newSales:s.newSales??null,spend:s.spend??null,subs:s.subs??b?.vnSubs??null,newSubs:s.newSubs??null};
+  x.recurring=ok(x.rev)&&ok(x.newSales)?x.rev-x.newSales:null;
+  x.churn=p&&ok(p.subs)&&ok(x.subs)&&ok(x.newSubs)?p.subs+x.newSubs-x.subs:null;
+  x.churnPct=ok(x.churn)&&p.subs?x.churn/p.subs:null;
+  x.net=p&&ok(p.subs)&&ok(x.subs)?x.subs-p.subs:null;
+  x.cpa=ok(x.spend)&&x.newSubs?x.spend/x.newSubs:null;
+  x.incNew=ok(x.newSales)&&x.newSubs?x.newSales/x.newSubs:null;
+  if(b){x.share=b.total?b.vnRev/b.total:null;x.vsRest=b.total-b.vnRev?b.vnRev/(b.total-b.vnRev):null;x.gp=b.vnRev-b.vnCost;x.gm=b.vnRev?x.gp/b.vnRev:null;x.gpSub=b.vnSubs?x.gp/b.vnSubs:null;x.arpu=b.vnSubs?b.vnRev/b.vnSubs:null;x.total=b.total}
+  x.ltv=ltvAt[k]??null;
+  x.ltvCpa=ok(x.ltv)&&x.cpa?x.ltv/x.cpa:null;
+  x.payback=ok(x.cpa)&&x.gpSub>0?x.cpa/x.gpSub:null;
+  X[k]=x;
+}
+const latestLtv=k=>{const ks=Object.keys(ltvAt).filter(m=>m<=k).sort();return ks.length?[ks.at(-1),ltvAt[ks.at(-1)]]:[null,null]};
+
+// ── State and filters ──
+const st={month:keys.at(-1),cmp:keys.length>1?keys.at(-2):null,range:999};
+try{const r=+localStorage.getItem('vn-range');if([12,24,999].includes(r))st.range=r}catch(e){}
+const msel=$('#month'),csel=$('#cmp');
+[...keys].reverse().forEach(k=>{msel.add(new Option(ml(k),k));csel.add(new Option(ml(k),k))});
+csel.add(new Option('Same month last year','yoy'),0);
+msel.value=st.month;if(st.cmp)csel.value=st.cmp;
+const yoy=k=>{const[y,m]=k.split('-');return (y-1)+'-'+m};
+msel.onchange=()=>{st.month=msel.value;if(csel.value==='yoy')st.cmp=X[yoy(st.month)]?yoy(st.month):null;else{st.cmp=X[prevKey(st.month)]?prevKey(st.month):null;if(st.cmp)csel.value=st.cmp}render()};
+csel.onchange=()=>{st.cmp=csel.value==='yoy'?(X[yoy(st.month)]?yoy(st.month):null):csel.value;render()};
+document.querySelectorAll('#range button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.r===st.range);b.onclick=()=>{st.range=+b.dataset.r;document.querySelectorAll('#range button').forEach(x=>x.setAttribute('aria-pressed',x===b));try{localStorage.setItem('vn-range',st.range)}catch(e){}renderCharts()}});
+
+// ── KPI tiles ──
+// dir: 1 = higher is better, -1 = lower is better, 0 = neutral; kind: 'pct' change or 'pts' change
+function tile(label,val,cur,prev,dir=1,kind='pct',hint=''){
+  let d='<span class="flat">no comparison</span>';
+  if(st.cmp&&ok(cur)&&ok(prev)){
+    let txt,diff;
+    if(kind==='pts'){diff=cur-prev;txt=`${Math.abs(diff*100).toFixed(1)} pts`}
+    else if(kind==='abs'){diff=cur-prev;txt=fn(Math.abs(diff))}
+    else{if(!prev){d='<span class="flat">new</span>'}diff=prev?(cur-prev)/Math.abs(prev):0;txt=`${Math.abs(diff*100).toFixed(1)}%`}
+    if(diff===0&&(prev||kind!=='pct'))d=`<span class="flat">no change vs ${mls(st.cmp)}</span>`;
+    else if(prev||kind!=='pct'){const cls=diff===0||dir===0?'flat':(diff>0)===(dir>0)?'up':'down';d=`<span class="${cls}">${diff>=0?'▲':'▼'} ${txt}</span><span>vs ${mls(st.cmp)}</span>`}
+  }
+  return `<div class="kpi"><span class="lbl">${label}</span><span class="v">${val}</span><span class="delta">${d}</span>${hint?`<span class="hint">${hint}</span>`:''}</div>`;
+}
+function renderKpis(){
+  const x=X[st.month],p=st.cmp?X[st.cmp]:{};
+  $('#sub').textContent=`${ml(st.month)}${st.cmp?' compared with '+ml(st.cmp):''} · data ${ml(keys[0])} to ${ml(keys.at(-1))}`;
+  $('#k-sales').innerHTML=[
+    tile('Revenue',fm(x.rev),x.rev,p.rev),
+    tile('New-customer sales',fm(x.newSales),x.newSales,p.newSales,1,'pct','first payments'),
+    tile('Recurring revenue',fm(x.recurring),x.recurring,p.recurring),
+    tile('Share of company sales',fp(x.share),x.share,p.share,1,'pts',ok(x.vsRest)?`${fp(x.vsRest)} of the rest of 011`:''),
+    tile('Gross margin',fp(x.gm),x.gm,p.gm,1,'pts','package tab cost only'),
+  ].join('').replace('<div class="kpi">','<div class="kpi lead">');
+  $('#k-cust').innerHTML=[
+    tile('Active subscribers',fn(x.subs),x.subs,p.subs),
+    tile('New subscribers',fn(x.newSubs),x.newSubs,p.newSubs),
+    tile('Churned',fn(x.churn),x.churn,p.churn,-1,'pct',ok(x.churnPct)?fp(x.churnPct)+' of last month':''),
+    tile('Net change',ok(x.net)?(x.net>0?'+':'')+fn(x.net):'–',x.net,p.net,1,'abs'),
+    tile('Revenue per subscriber',f2(x.arpu),x.arpu,p.arpu),
+  ].join('');
+  const[lk,lv]=latestLtv(st.month);const lc=ok(lv)&&x.cpa?lv/x.cpa:null,pc=st.cmp?(()=>{const[,pv]=latestLtv(st.cmp);return ok(pv)&&p.cpa?pv/p.cpa:null})():null;
+  $('#k-acq').innerHTML=[
+    tile('Marketing spend',fm(x.spend),x.spend,p.spend,0),
+    tile('CPA',f2(x.cpa),x.cpa,p.cpa,-1),
+    tile('First-month income per new customer',f2(x.incNew),x.incNew,p.incNew),
+    tile('LTV (margin)',f2(lv),lv,st.cmp?latestLtv(st.cmp)[1]:null,1,'pct',lk?(lk===st.month?'all countries':'latest: '+ml(lk)):'no LTV data'),
+    tile('LTV ÷ CPA',fx(lc),lc,pc),
+    tile('Payback',ok(x.payback)?x.payback.toFixed(1)+' mo':'–',x.payback,p.payback,-1,'pct','CPA ÷ monthly gross profit per subscriber'),
+  ].join('');
+}
+
+// ── Charts ──
+Chart.defaults.font.family=css('--body');Chart.defaults.font.size=12;Chart.defaults.animation=false;
+const charts={};
+function mkChart(id,cfg){const el=document.getElementById(id);try{charts[id]?.destroy()}catch(e){}try{Chart.getChart(el)?.destroy()}catch(e){}try{charts[id]=new Chart(el,cfg)}catch(e){console.error(e)}}
+const band={id:'band',beforeDatasetsDraw(c,_,o){const i=o.idx;if(i==null||i<0)return;const x=c.scales.x,w=x.width/Math.max(1,c.data.labels.length),cx=x.getPixelForValue(i);c.ctx.save();c.ctx.fillStyle=css('--brand-soft');c.ctx.fillRect(cx-w/2,c.chartArea.top,w,c.chartArea.bottom-c.chartArea.top);c.ctx.restore()}};
+function opts(fmtY,{stacked=false,min}={}){return{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+  plugins:{legend:{display:false},band:{idx:-1},tooltip:{backgroundColor:css('--surface'),titleColor:css('--fg'),bodyColor:css('--fg2'),borderColor:css('--line-strong'),borderWidth:1,padding:10,boxPadding:4,usePointStyle:true,callbacks:{label:c=>' '+c.dataset.label+': '+(c.dataset.fmt||fmtY)(c.parsed.y)}}},
+  scales:{x:{stacked,grid:{display:false},border:{color:css('--line-strong')},ticks:{color:css('--fg3'),maxRotation:0,autoSkipPadding:14}},
+    y:{stacked,beginAtZero:min==null,min,grid:{color:css('--line')},border:{display:false},ticks:{color:css('--fg3'),maxTicksLimit:6,callback:v=>(fmtY.axis||fmtY)(v)}}}}}
+const line=(label,data,col,extra={})=>({type:'line',label,data,borderColor:col,backgroundColor:col,borderWidth:2,pointRadius:0,pointHoverRadius:5,pointHoverBorderWidth:2,pointHoverBorderColor:css('--surface'),tension:.25,spanGaps:true,...extra});
+const bar=(label,data,col,extra={})=>({type:'bar',label,data,backgroundColor:col,borderColor:css('--surface'),borderWidth:{top:2,bottom:0,left:0,right:0},borderSkipped:false,maxBarThickness:22,...extra});
+function renderCharts(){
+  const ks=keys.slice(-st.range),labels=ks.map(mls),idx=ks.indexOf(st.month),col=f=>ks.map(k=>X[k][f]??null);
+  const money=Object.assign(v=>fm(v),{axis:fk}),cnt=v=>fn(v),pct=v=>fp(v),usd2=Object.assign(v=>f2(v),{axis:v=>'$'+v});
+  const mk=(id,type,datasets,f,o={})=>{const op=opts(f,o);op.plugins.band.idx=idx;mkChart(id,{type,data:{labels,datasets},options:op,plugins:[band]})};
+  mk('c-rev','bar',[bar('New-customer sales',col('newSales'),css('--brand'),{stack:'r',order:2}),bar('Recurring',col('recurring'),css('--slate'),{stack:'r',order:2}),bar('Revenue (no split in the sheet)',ks.map(k=>ok(X[k].newSales)?null:X[k].rev),css('--line-strong'),{stack:'r',order:2}),line('Marketing spend',col('spend'),css('--fg'),{order:1,stack:'spend'})],money,{stacked:true});
+  mk('c-subs','line',[line('Active subscribers',col('subs'),css('--slate'),{fill:{target:'origin'},backgroundColor:css('--brand-soft')})],cnt);
+  const x=X[st.month],p=X[prevKey(st.month)];$('#n-subs').textContent=ok(x.subs)?`${fn(x.subs)} in ${ml(st.month)}${p&&ok(p.subs)?`, ${x.subs>=p.subs?'+':'−'}${fn(Math.abs(x.subs-p.subs))} on the month`:''}`:'';
+  mk('c-flow','bar',[bar('New',col('newSubs'),css('--good'),{order:2}),bar('Churned',ks.map(k=>ok(X[k].churn)?-X[k].churn:null),css('--bad'),{order:2,fmt:v=>fn(Math.abs(v))}),line('Net change',col('net'),css('--fg'),{order:1})],cnt);
+  mk('c-unit','line',[line('CPA',col('cpa'),css('--bad')),line('First-month income per new customer',col('incNew'),css('--brand')),line('LTV (margin)',col('ltv'),css('--c-hispanic'),{pointRadius:0})],usd2);
+  mk('c-share','line',[line('Share of all 011 sales',col('share'),css('--brand'),{fill:{target:'origin'},backgroundColor:css('--brand-soft')}),line('Compared with the rest of 011',col('vsRest'),css('--fg3'),{borderDash:[4,4]})],Object.assign(pct,{axis:v=>Math.round(v*100)+'%'}));
+  mk('c-churn','line',[line('Churn rate',col('churnPct'),css('--bad'))],Object.assign(v=>fp(v),{axis:v=>Math.round(v*100)+'%'}));
+}
+
+// ── LTV by country ──
+function spark(vals){const w=120,h=28,v=vals.map((y,i)=>[i,y]).filter(([,y])=>ok(y));if(v.length<2)return'';const ys=v.map(p=>p[1]),lo=Math.min(...ys),hi=Math.max(...ys),sx=i=>2+i*(w-6)/(vals.length-1),sy=y=>h-3-(hi===lo?.5:(y-lo)/(hi-lo))*(h-6);const pts=v.map(([i,y])=>`${sx(i).toFixed(1)},${sy(y).toFixed(1)}`).join(' ');const[li,ly]=v.at(-1);return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${css('--c-hispanic')}" stroke-width="1.5"/><circle cx="${sx(li)}" cy="${sy(ly)}" r="2.5" fill="${css('--c-hispanic')}"/></svg>`}
+function renderLtv(){
+  if(!L||!L.months.length){$('#n-ltv').textContent='';$('#t-ltv').innerHTML='<tbody><tr><td class="empty">No LTV tab in the uploaded report.</td></tr></tbody>';return}
+  const last=L.months.length-1,cpa=X[st.month].cpa;
+  const ch=(v,n)=>{const a=v[last],b=v[last-n];if(!ok(a)||!ok(b))return'<span class="flat">–</span>';const d=a-b;return `<span class="${d>=0?'up':'down'}">${d>=0?'+':'−'}${f2(Math.abs(d))}</span>`};
+  const row=(name,v,strong)=>{const r=ok(v[last])&&cpa?v[last]/cpa:null;const pill=!ok(r)?'':r<1.5?'<span class="pill p-loss">Below 1.5×</span>':r>=3?'<span class="pill p-good">3× or more</span>':'';return `<tr${strong?' style="font-weight:500"':''}><td class="l">${name}</td><td>${f2(v[last])}</td><td>${ch(v,3)}</td><td>${L.months.length>12?ch(v,12):'<span class="flat">–</span>'}</td><td>${spark(v)}</td><td>${fx(r)}${pill}</td></tr>`};
+  const rows=Object.entries(L.rows).sort((a,b)=>(b[1][last]??-1)-(a[1][last]??-1));
+  $('#n-ltv').textContent=`Margin LTV in ${ml(L.months[last])} · trend since ${ml(L.months[0])} · ÷ CPA uses ${ml(st.month)} CPA (${f2(cpa)})`;
+  $('#t-ltv').innerHTML=`<thead><tr><th>Country</th><th>LTV</th><th>3-month change</th><th>12-month change</th><th style="text-align:left">Trend</th><th>LTV ÷ CPA</th></tr></thead><tbody>${rows.map(([n,v])=>row(n,v)).join('')}</tbody>${L.total?`<tfoot>${row('All countries',L.total,true).replace(/^<tr[^>]*>/,'<tr>')}</tfoot>`:''}`;
+}
+
+// ── Packages ──
+const pretty=n=>n.replace(/^Vnumber_/,'').replace(/_/g,' ');
+function renderPkgs(){
+  const b=salesBy[st.month],pb=st.cmp?salesBy[st.cmp]:null;
+  if(!b){$('#n-pkg').textContent='';$('#t-pkg').innerHTML=`<tbody><tr><td class="empty">No package rows for ${ml(st.month)} in the uploaded report.</td></tr></tbody>`;return}
+  const list=[...b.pk.values()].sort((a,c)=>c.rev-a.rev);
+  const dv=(a,c,f)=>!c?'<span class="flat">new</span>':`<span class="${a-c>=0?'up':'down'}">${a-c>0?'+':a-c<0?'−':''}${f(Math.abs(a-c))}</span>`;
+  $('#n-pkg').textContent=`${ml(st.month)}${pb?' · change vs '+ml(st.cmp):''} · packages named Vnumber_…`;
+  let t={s:0,r:0,c:0,m:0};
+  $('#t-pkg').innerHTML=`<thead><tr><th>Package</th><th>Market</th><th>Subs</th><th>Subs Δ</th><th>Revenue</th><th>Rev. Δ</th><th>Margin</th><th>Per subscriber</th><th>Min/sub</th></tr></thead><tbody>`+
+    list.map(o=>{const q=pb?.pk.get(o.name);t.s+=o.subs;t.r+=o.rev;t.c+=o.cost;t.m+=o.min;return `<tr><td class="name" title="${o.name}">${pretty(o.name)}</td><td class="l">${[...o.mk].join(', ')}</td><td>${fn(o.subs)}</td><td>${pb?dv(o.subs,q?.subs,fn):'–'}</td><td>${fm(o.rev)}</td><td>${pb?dv(o.rev,q?.rev,fm):'–'}</td><td>${o.rev?fp((o.rev-o.cost)/o.rev):'–'}</td><td>${o.subs?f2(o.rev/o.subs):'–'}</td><td>${o.subs?(o.min/o.subs).toFixed(0):'–'}</td></tr>`}).join('')+
+    `</tbody><tfoot><tr><td>${list.length} packages</td><td></td><td>${fn(t.s)}</td><td></td><td>${fm(t.r)}</td><td></td><td>${t.r?fp((t.r-t.c)/t.r):'–'}</td><td>${t.s?f2(t.r/t.s):'–'}</td><td>${t.s?(t.m/t.s).toFixed(0):'–'}</td></tr></tfoot>`;
+}
+
+// ── Monthly table ──
+function renderMonthly(){
+  const cols=[['Month',x=>ml(x.k)],['Revenue',x=>fm(x.rev)],['New-customer sales',x=>fm(x.newSales)],['Recurring',x=>fm(x.recurring)],['Share of 011',x=>fp(x.share)],['Spend',x=>fm(x.spend)],['New subs',x=>fn(x.newSubs)],['Churned',x=>fn(x.churn)],['Churn',x=>fp(x.churnPct)],['Active subs',x=>fn(x.subs)],['CPA',x=>f2(x.cpa)],['Income / new',x=>f2(x.incNew)],['LTV',x=>f2(x.ltv)],['Gross margin',x=>fp(x.gm)]];
+  $('#t-month').innerHTML=`<thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${[...keys].reverse().map(k=>`<tr${k===st.month?' class="sel"':''}>${cols.map((c,i)=>`<td${i===0?' class="l"':''}>${c[1](X[k])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+}
+
+function render(){[renderKpis,renderCharts,renderLtv,renderPkgs,renderMonthly].forEach(f=>{try{f()}catch(e){console.error(f.name,e)}})}
+render();
+};
+</script>
+<script type="module">
+import { initPage } from './sales-data.js';
+initPage({
+  title: 'VNUMBER',
+  emptyText: 'No VNUMBER data has been uploaded yet. Upload the monthly Package Profitability workbook (.xlsx). This page uses its “Vnumber Summary” and “LTV” tabs and the VNUMBER packages in the main tab.',
+  ready: d => !!(d.summary && Object.keys(d.summary).length) || Object.values(d.sales || {}).some(rows => rows.some(r => r[2].startsWith('Vnumber_'))),
+  render: d => window.startVnumber(d),
+});
+</script>
+</body>
+</html>
