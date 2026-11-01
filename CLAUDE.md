@@ -2,7 +2,7 @@
 
 ## Project Overview
 Marketing dashboard for **011 Global**'s Google Ads campaigns, which target
-Israel and Brazil markets. Four sections:
+Israel and Brazil markets. Four sections, plus a Sales page (below):
 
 1. **Performance** — campaigns and conversions grouped by **market**. Two markets:
    **Israel** (number porting, per the strategy doc — Israelis abroad and US/Canadian
@@ -47,6 +47,22 @@ file, vanilla JS, Firebase, GitHub Pages). Branded 011 Global: `logo.png` (trimm
 - **Later**: daily rule checks, weekly Claude review and image/video generation
   write `mkt_proposals` / `mkt_reviews` / `mkt_activity`; this site only reads them
   and records decisions.
+
+## Sales page (`sales.html`)
+Package Profitability dashboard (monthly retail package sales: subscribers, minutes,
+charged, cost, gross profit by market / type / package, sleeping packages, Vnumber
+split). Separate file with the same Firebase login; linked as "Sales" in the top bar.
+- Data: `mkt_sales/{YYYY-MM}` = {month, rows (JSON string of
+  [market, type, package, subscribers, minutes, charged, cost]), rowCount, source,
+  uploadedBy, uploadedAt}; `mkt_salesMeta/last` = {by, at, file, from, to}.
+- Filled by the page's **Upload monthly report** button: reads the
+  `PackagesProfitability_Active_Sl` tab of the xlsx in the browser (SheetJS) and
+  overwrites every month in the file. Rules: Bglobal = BGlobal, RenewalCombined*
+  count as Monthly, Vnumber = package names starting `Vnumber_`, sleeping =
+  subscribers with zero minutes.
+- Sales figures must never be committed (`.gitignore` blocks `*.xlsx` and
+  `sales-preview.json`). Local preview: `sales.html?preview` reads a local
+  `sales-preview.json` ({d,m,t,p,r} format) and keeps uploads in memory.
 
 ## Platforms
 Every campaign has `platform` ('google' | 'meta'; missing = 'google'). A top-bar

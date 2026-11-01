@@ -1,1 +1,4 @@
 .DS_Store
+# Local-only sales preview data and test files (never commit sales figures)
+sales-preview.json
+*.xlsx

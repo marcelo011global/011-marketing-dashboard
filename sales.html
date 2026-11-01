@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>011 Global — Sales</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+/* Sales page of the 011 Global marketing dashboard. Layout: top bar → filters → KPI strip → two trend charts → market + sleeping panels → full package ledger */
+:root{
+  --bg:#F7F7F5; --surface:#FFFFFF; --sunk:#F1F1EE; --line:#E5E5E5; --line-strong:#D4D4D0;
+  --fg:#1A1A1A; --fg2:#555555; --fg3:#888888;
+  --brand:#EE7805; --brand-ink:#C46204; --brand-soft:#FDF0E3;
+  --slate:#3A6EA5;
+  --good:#1E7F4F; --good-soft:#E3F3EA; --bad:#B42318; --bad-soft:#FBE7E4; --warn:#9A6200; --warn-soft:#FCF0D6; --sleep:#5A5F86; --sleep-soft:#E9EAF4;
+  --c-israel:#3A6EA5; --c-brazil:#EE7805; --c-hispanic:#2A9D8F; --c-bglobal:#9B5DE5; --c-asia:#C2185B;
+  --display:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif; --body:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif; --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--body);margin:0}
+.wrap{max-width:1320px;margin:0 auto;padding-inline:clamp(16px,3vw,32px);padding-block:20px 48px;display:grid;gap:20px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--brand-ink)}
+.brand i{width:10px;height:10px;border-radius:50%;background:var(--brand);display:inline-block}
+h1{font:600 clamp(22px,2.6vw,30px)/1.15 var(--display);margin:6px 0 0;text-wrap:balance;letter-spacing:-.01em}
+.sub{color:var(--fg2);margin:4px 0 0}
+.filters{position:static;background:var(--bg);padding-block:10px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.f{display:flex;align-items:center;gap:8px}
+.f label,.lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg3);font-weight:500}
+select,input[type=search]{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:6px 10px;min-height:34px}
+select:focus-visible,input:focus-visible,button:focus-visible,th:focus-visible,tr:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:500 13px/1 var(--body);border:1px solid var(--line-strong);background:var(--surface);color:var(--fg2);border-radius:999px;padding:7px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip .dot{width:8px;height:8px;border-radius:50%}
+.chip[aria-pressed="true"]{color:var(--fg);border-color:var(--fg2);background:var(--sunk)}
+.chip[aria-pressed="false"]{opacity:.55}
+.chip[aria-pressed="false"] .dot{background:transparent!important;outline:1.5px solid var(--fg3)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
+.seg button{font:500 12px/1 var(--body);background:var(--surface);color:var(--fg2);border:0;padding:8px 11px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.kpi{background:var(--surface);padding:14px 16px;display:grid;gap:4px;min-width:0}
+.kpi .v{font:500 clamp(20px,2.2vw,26px)/1.1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi.lead .v{color:var(--brand-ink)}
+.delta{font:500 12px/1.2 var(--mono);display:flex;gap:6px;align-items:center;color:var(--fg3)}
+.up{color:var(--good)}.down{color:var(--bad)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:grid;gap:12px;min-width:0;align-content:start}
+.ph{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+h2{font:600 15px/1.3 var(--display);margin:0}
+.note{color:var(--fg3);font-size:12px;margin:0}
+.chart{position:relative;height:280px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--fg2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend i.ln{height:3px;width:14px;border-radius:2px}
+.tbl{overflow-x:auto;min-width:0}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font:500 11px/1.2 var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--fg3);position:sticky;top:0;background:var(--surface)}
+th.s{cursor:pointer;user-select:none}
+th.s[aria-sort="descending"]::after{content:" ↓"}th.s[aria-sort="ascending"]::after{content:" ↑"}
+td{font-family:var(--mono);font-size:13px}
+td.name{font-family:var(--body);font-size:13px;max-width:320px;overflow:hidden;text-overflow:ellipsis}
+td .mk{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:var(--sunk)}
+tbody tr.sel{background:var(--brand-soft)}
+tfoot td{font-weight:500;border-top:1px solid var(--line-strong);border-bottom:0}
+.pill{display:inline-block;font:500 11px/1 var(--body);padding:4px 7px;border-radius:999px;margin-left:4px}
+.p-loss{background:var(--bad-soft);color:var(--bad)}.p-sleep{background:var(--sleep-soft);color:var(--sleep)}.p-low{background:var(--warn-soft);color:var(--warn)}.p-new{background:var(--good-soft);color:var(--good)}
+.bar{display:inline-block;height:6px;border-radius:3px;background:var(--brand);vertical-align:middle;margin-left:8px;opacity:.75}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat{display:grid;gap:2px;min-width:0}
+.stat b{font:500 20px/1.1 var(--mono);color:var(--sleep)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools input{min-width:0;width:min(260px,100%)}
+.more{font:500 13px var(--body);background:none;border:1px solid var(--line-strong);color:var(--fg2);border-radius:8px;padding:7px 12px;cursor:pointer;justify-self:start}
+.detail{border:1px solid var(--line-strong);border-radius:10px;padding:12px 14px;display:grid;gap:8px;background:var(--bg)}
+.detail .chart{height:200px}
+.x{background:none;border:0;color:var(--fg3);cursor:pointer;font-size:13px}
+.empty{color:var(--fg3);padding:16px;text-align:center}
+footer{color:var(--fg3);font-size:12px}
+.topbar{background:var(--surface);border-bottom:1px solid var(--line);padding:0 1.5rem;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;flex-wrap:wrap}
+.topbar-left,.topbar-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.logo{display:flex;align-items:center}.logo-img{height:30px;width:auto;display:block}
+.app-name{font-size:12px;font-weight:700;color:var(--fg3);text-transform:uppercase;letter-spacing:.06em;padding-left:10px;margin-right:10px;border-left:1px solid var(--line)}
+.nav-btn{padding:6px 11px;border-radius:6px;font-size:13px;font-weight:500;color:var(--fg3);text-decoration:none}
+.nav-btn:hover{color:var(--fg);background:var(--bg)}
+.nav-btn.active{color:var(--brand);background:var(--brand-soft)}
+.user{font-size:12.5px;color:var(--fg3)}
+.btn{padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);font:600 12.5px var(--body);cursor:pointer;color:var(--fg)}
+.btn:hover{border-color:var(--fg3)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--fg3)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-ink)}
+.btn:disabled{opacity:.5;cursor:wait}
+.upload{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:flex-end}
+.upload .note{max-width:340px;text-align:right}
+.gate{max-width:520px;margin:12vh auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;display:grid;gap:12px;justify-items:start}
+.gate h1{font-size:20px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--fg);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:200;max-width:90vw}
+.nodata{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center;padding:16px;background:var(--surface);color:var(--fg2)}
+[hidden]{display:none!important}
+.sstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.sstats .stat b{color:var(--fg)}
+.movers{display:grid;grid-template-columns:1fr 1fr;gap:16px;min-width:0}
+.movers h3{font:500 11px/1.2 var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--fg3);margin:0 0 6px}
+.movers ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.movers li{display:flex;justify-content:space-between;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:13px;min-width:0}
+.movers li:hover{background:var(--sunk)}
+.movers li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.movers li span:last-child{font-family:var(--mono);white-space:nowrap}
+@media (max-width:560px){.movers{grid-template-columns:1fr}}
+.reset{font:500 13px var(--body);background:var(--fg);color:var(--bg);border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+.banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 14px;font-weight:500}
+.seg button:disabled,.chip:disabled{opacity:.35;cursor:not-allowed}
+@media (max-width:760px){.filters{position:static}}
+@media (max-width:560px){.stats{grid-template-columns:1fr 1fr}.chart{height:240px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <a class="logo" href="index.html#/performance"><img src="logo.png" alt="011 Global" class="logo-img"></a>
+    <span class="app-name">Marketing</span>
+    <a class="nav-btn" href="index.html#/performance">Markets</a>
+    <a class="nav-btn" href="index.html#/campaigns">Campaigns</a>
+    <a class="nav-btn" href="index.html#/pages">Landing pages</a>
+    <a class="nav-btn" href="index.html#/reviews">Reviews</a>
+    <a class="nav-btn active" href="sales.html">Sales</a>
+  </div>
+  <div class="topbar-right">
+    <span class="user" id="user-display"></span>
+    <button class="btn ghost" type="button" id="signout">Sign out</button>
+  </div>
+</header>
+
+<div class="gate" id="gate" hidden></div>
+<input type="file" id="file" accept=".xlsx,.xls" hidden>
+
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div>
+      <div class="brand"><i></i>011 Global · Monthly sales</div>
+      <h1>Package Profitability</h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <div class="upload">
+      <p class="note" id="srcnote"></p>
+      <button class="btn primary" type="button" id="upload">Upload monthly report</button>
+    </div>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <div class="f"><label for="month">Month</label><select id="month"></select></div>
+    <div class="f"><label for="cmp">Compare to</label><select id="cmp"></select></div>
+    <div class="f"><span class="lbl">Packages</span><div class="seg" id="vn" role="group" aria-label="Package group"><button data-v="" aria-pressed="true">Total</button><button data-v="vn" aria-pressed="false">Vnumber</button><button data-v="non" aria-pressed="false">Non-Vnumber</button></div></div>
+    <div class="f"><label for="type">Type</label><select id="type"></select></div>
+    <div class="f"><span class="lbl">Market</span><div class="chips" id="markets"></div></div>
+  </div>
+
+  <div class="banner" id="banner" role="status" hidden></div>
+
+  <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><h2>Revenue, cost and gross profit</h2>
+        <div class="seg" id="range" role="group" aria-label="Time range"><button data-r="12">12 mo</button><button data-r="24" aria-pressed="true">24 mo</button><button data-r="999">All</button></div></div>
+      <div class="legend"><span><i class="ln" style="background:var(--slate)"></i>Revenue (charged)</span><span><i class="ln" style="background:var(--brand)"></i>Gross profit</span><span><i class="ln" style="background:var(--fg3)"></i>Cost</span></div>
+      <div class="chart"><canvas id="trend" aria-label="Monthly revenue, cost and gross profit"></canvas><div class="nodata" hidden></div></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>By market</h2>
+        <div class="seg" id="mmetric" role="group" aria-label="Metric"><button data-k="rev" aria-pressed="true">Revenue</button><button data-k="gp">Gross profit</button><button data-k="subs">Subscribers</button></div></div>
+      <div class="legend" id="mlegend"></div>
+      <div class="chart"><canvas id="bymarket" aria-label="Monthly figures stacked by market"></canvas><div class="nodata" hidden></div></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><h2>Markets this month</h2><p class="note" id="mnote"></p></div>
+      <div class="tbl"><table id="mtable"></table></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>Sleeping packages</h2><p class="note">Subscribers billed, zero minutes used</p></div>
+      <div class="stats" id="sleepstats"></div>
+      <div class="tbl"><table id="sleeptable"></table></div>
+    </section>
+  </div>
+
+  <section class="panel" id="subspanel">
+    <div class="ph"><h2>Subscribers</h2>
+      <div class="seg" id="sview" role="group" aria-label="Subscriber view"><button data-s="market" aria-pressed="true">By market</button><button data-s="type">By type</button><button data-s="activity">Active vs sleeping</button></div></div>
+    <div class="sstats" id="substats"></div>
+    <div class="legend" id="slegend"></div>
+    <div class="chart"><canvas id="subchart" aria-label="Subscribers per month"></canvas><div class="nodata" hidden></div></div>
+    <div class="grid2">
+      <div class="tbl"><table id="subtable"></table></div>
+      <div class="movers" id="movers"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="pkgpanel">
+    <div class="ph"><h2>Packages</h2>
+      <div class="tools">
+        <input type="search" id="q" placeholder="Search package name" aria-label="Search packages">
+        <select id="flag" aria-label="Show"><option value="">All packages</option><option value="loss">Loss-making</option><option value="low">Margin under 60%</option><option value="sleep">Sleeping</option><option value="new">New this month</option></select>
+      </div></div>
+    <div class="detail" id="detail" hidden>
+      <div class="ph"><h2 id="dtitle"></h2><button class="x" id="dclose">Close ✕</button></div>
+      <div class="legend"><span><i class="ln" style="background:var(--slate)"></i>Revenue</span><span><i class="ln" style="background:var(--brand)"></i>Gross profit</span><span><i class="ln" style="background:var(--c-hispanic)"></i>Subscribers (right side, indexed)</span></div>
+      <div class="chart"><canvas id="dchart"></canvas></div>
+      <p class="note" id="dnote"></p>
+    </div>
+    <div class="tbl"><table id="ptable"></table></div>
+    <button class="more" id="more" hidden></button>
+  </section>
+
+  <footer>Source: the monthly Package Profitability report (PackagesProfitability_Active_Sl tab), uploaded with the button above. Gross profit = Charged − Cost. Margin = gross profit ÷ charged. ARPU = charged ÷ subscribers. Vnumber = packages named Vnumber_…, the same set as the workbook’s Vnumber pivot. Click a package row to see its history.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+window.startDashboard=function(DATA){
+const D=DATA.d,M=DATA.m,T=DATA.t,P=DATA.p,R=DATA.r;
+const MKEY={Israel:'israel',Brazil:'brazil',Hispanic:'hispanic',BGlobal:'bglobal',Asia:'asia'};
+const MORDER=['Israel','Brazil','Hispanic','BGlobal','Asia'].filter(m=>M.includes(m));
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const mcol=m=>css('--c-'+MKEY[m]);
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const ml=i=>{const[y,m]=D[i].split('-');return MN[+m-1]+' '+y};
+const mls=i=>{const[y,m]=D[i].split('-');return MN[+m-1]+' ’'+y.slice(2)};
+const $=s=>document.querySelector(s);
+const fm=(v,d=0)=>'$'+Math.round(v).toLocaleString('en-US');
+const fk=v=>Math.abs(v)>=1e6?'$'+(v/1e6).toFixed(2)+'M':Math.abs(v)>=1e3?'$'+(v/1e3).toFixed(1)+'k':'$'+v.toFixed(0);
+const fn=v=>Math.round(v).toLocaleString('en-US');
+const fp=v=>isFinite(v)?(v*100).toFixed(1)+'%':'–';
+const f2=v=>'$'+v.toFixed(2);
+
+const st={month:D.length-1,cmp:D.length-2,type:'',mk:new Set(MORDER),range:24,metric:'rev',q:'',flag:'',sort:'rev',dir:-1,limit:25,pkg:null,vn:'',sview:'market'};
+try{const s=JSON.parse(localStorage.getItem('pp-ui')||'{}');if(s.range)st.range=s.range;if(s.metric)st.metric=s.metric}catch(e){}
+const save=()=>{try{localStorage.setItem('pp-ui',JSON.stringify({range:st.range,metric:st.metric}))}catch(e){}};
+
+const VN=P.map(p=>p.startsWith('Vnumber_'));
+const passX=r=>(st.type===''||T[r[2]]===st.type)&&(st.vn===''||(st.vn==='vn')===VN[r[3]]);
+const pass=r=>st.mk.has(M[r[1]])&&passX(r);
+function agg(filter){const o={subs:0,min:0,rev:0,cost:0};for(const r of R)if(filter(r)){o.subs+=r[4];o.min+=r[5];o.rev+=r[6];o.cost+=r[7]}o.gp=o.rev-o.cost;return o}
+function byPkg(mi){const m=new Map();for(const r of R){if(r[0]!==mi||!pass(r))continue;let o=m.get(r[3]);if(!o){o={p:r[3],mk:new Set(),ty:new Set(),subs:0,min:0,rev:0,cost:0};m.set(r[3],o)}o.mk.add(r[1]);o.ty.add(r[2]);o.subs+=r[4];o.min+=r[5];o.rev+=r[6];o.cost+=r[7]}for(const o of m.values())o.gp=o.rev-o.cost;return m}
+
+// filters
+const msel=$('#month'),csel=$('#cmp'),tsel=$('#type');
+for(let i=D.length-1;i>=0;i--){msel.add(new Option(ml(i),i));csel.add(new Option(ml(i),i))}
+csel.add(new Option('Same month last year','yoy'),0);
+msel.value=st.month;csel.value=st.cmp;
+tsel.add(new Option('All types',''));T.forEach(t=>{const o=new Option(t,t);o.dataset.l=t;tsel.add(o)});
+const mbox=$('#markets');
+MORDER.forEach(m=>{const b=document.createElement('button');b.className='chip';b.type='button';b.setAttribute('aria-pressed','true');b.dataset.m=m;b.innerHTML=`<span class="dot" style="background:var(--c-${MKEY[m]})"></span>${m}`;b.onclick=()=>{if(st.mk.has(m)){if(st.mk.size===1)return;st.mk.delete(m)}else st.mk.add(m);b.setAttribute('aria-pressed',st.mk.has(m));render()};mbox.appendChild(b)});
+msel.onchange=()=>{st.month=+msel.value;if(csel.value!=='yoy'){st.cmp=Math.max(0,st.month-1);csel.value=st.cmp}else st.cmp=st.month-12;render()};
+csel.onchange=()=>{st.cmp=csel.value==='yoy'?st.month-12:+csel.value;render()};
+tsel.onchange=()=>{st.type=tsel.value;render()};
+document.querySelectorAll('#range button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.r===st.range);b.onclick=()=>{st.range=+b.dataset.r;document.querySelectorAll('#range button').forEach(x=>x.setAttribute('aria-pressed',x===b));save();renderCharts();renderSubs()}});
+document.querySelectorAll('#mmetric button').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.k===st.metric);b.onclick=()=>{st.metric=b.dataset.k;document.querySelectorAll('#mmetric button').forEach(x=>x.setAttribute('aria-pressed',x===b));save();renderCharts()}});
+document.querySelectorAll('#vn button').forEach(b=>{b.onclick=()=>{st.vn=b.dataset.v;document.querySelectorAll('#vn button').forEach(x=>x.setAttribute('aria-pressed',x===b));st.limit=25;render()}});
+document.querySelectorAll('#sview button').forEach(b=>{b.onclick=()=>{st.sview=b.dataset.s;document.querySelectorAll('#sview button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderSubs()}});
+$('#q').oninput=e=>{st.q=e.target.value.toLowerCase();st.limit=25;renderPkgs()};
+$('#flag').onchange=e=>{st.flag=e.target.value;st.limit=25;renderPkgs()};
+$('#more').onclick=()=>{st.limit+=50;renderPkgs()};
+$('#dclose').onclick=()=>{st.pkg=null;$('#detail').hidden=true;renderPkgs()};
+
+function delta(cur,prev,kind){
+  if(prev==null||st.cmp<0)return '<span>no comparison</span>';
+  if(kind==='pt'){const d=(cur-prev)*100;const c=d>=0?'up':'down';return `<span class="${c}">${d>=0?'▲':'▼'} ${Math.abs(d).toFixed(1)} pts</span><span>vs ${mls(st.cmp)}</span>`}
+  if(!prev)return '<span>new</span>';
+  const d=(cur-prev)/Math.abs(prev);const c=kind==='inv'?(d<=0?'up':'down'):(d>=0?'up':'down');
+  return `<span class="${c}">${d>=0?'▲':'▼'} ${Math.abs(d*100).toFixed(1)}%</span><span>vs ${mls(st.cmp)}</span>`;
+}
+
+function renderKpis(){
+  const a=agg(r=>r[0]===st.month&&pass(r));const b=st.cmp>=0?agg(r=>r[0]===st.cmp&&pass(r)):null;
+  const k=[
+    ['Revenue (charged)',fm(a.rev),delta(a.rev,b&&b.rev),'lead'],
+    ['Gross profit',fm(a.gp),delta(a.gp,b&&b.gp)],
+    ['Margin',a.rev?fp(a.gp/a.rev):'–',delta(a.gp/a.rev,b&&b.gp/b.rev,'pt')],
+    ['Cost',fm(a.cost),delta(a.cost,b&&b.cost,'inv')],
+    ['Subscribers',fn(a.subs),delta(a.subs,b&&b.subs)],
+    ['ARPU',f2(a.rev/a.subs||0),delta(a.rev/a.subs,b&&b.rev/b.subs)],
+    ['Minutes',fn(a.min),delta(a.min,b&&b.min)],
+  ];
+  $('#kpis').innerHTML=k.map(([l,v,d,c])=>`<div class="kpi ${c||''}"><span class="lbl">${l}</span><span class="v">${v}</span><span class="delta">${d}</span></div>`).join('');
+  $('#sub').textContent=`${ml(st.month)} · ${st.mk.size===MORDER.length?'all markets':[...st.mk].join(', ')} · ${st.vn==='vn'?'Vnumber packages':st.vn==='non'?'non-Vnumber packages':'all packages'} · ${st.type?tsel.selectedOptions[0].text:'all package types'} · data ${ml(0)} to ${ml(D.length-1)}`;
+}
+
+Chart.defaults.font.family=css('--body');Chart.defaults.font.size=12;Chart.defaults.animation=matchMedia('(prefers-reduced-motion: reduce)').matches?false:{duration:300};
+let trendC,mktC,detC,subC;
+function mkChart(prev,id,cfg){
+  const el=document.getElementById(id);
+  // Always rebuild on the live canvas; drop any chart left on it (e.g. by an earlier copy of the page after an update)
+  try{if(prev)prev.destroy()}catch(e){}
+  try{const old=Chart.getChart(el);if(old)old.destroy()}catch(e){}
+  if(cfg.options)cfg.options.animation=false;
+  try{return new Chart(el,cfg)}catch(e){console.error(e);return null}
+}
+function baseOpts(fmtY){
+  return {responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:css('--surface'),titleColor:css('--fg'),bodyColor:css('--fg2'),borderColor:css('--line-strong'),borderWidth:1,padding:10,boxPadding:4,usePointStyle:true,callbacks:{label:c=>' '+c.dataset.label+': '+fmtY(c.parsed.y)}}},
+    scales:{x:{grid:{display:false},border:{color:css('--line-strong')},ticks:{color:css('--fg3'),maxRotation:0,autoSkipPadding:14}},
+      y:{beginAtZero:true,grid:{color:css('--line')},border:{display:false},ticks:{color:css('--fg3'),callback:v=>fmtY(v,true),maxTicksLimit:6}}}};
+}
+const selBand={id:'selBand',beforeDatasetsDraw(c,_,o){const i=o.idx;if(i==null||i<0)return;const x=c.scales.x;const w=(x.width/Math.max(1,c.data.labels.length));const cx=x.getPixelForValue(i);const ctx=c.ctx;ctx.save();ctx.fillStyle=css('--brand-soft');ctx.fillRect(cx-w/2,c.chartArea.top,w,c.chartArea.bottom-c.chartArea.top);ctx.restore()}};
+
+function renderCharts(){
+  const start=Math.max(0,D.length-st.range);const idx=[];for(let i=start;i<D.length;i++)idx.push(i);
+  const labels=idx.map(mls);
+  const tot=idx.map(i=>agg(r=>r[0]===i&&pass(r)));
+  const selI=idx.indexOf(st.month);
+  const line=(label,data,col,w=2)=>({label,data,borderColor:col,backgroundColor:col,borderWidth:w,pointRadius:0,pointHoverRadius:5,pointHoverBorderWidth:2,pointHoverBorderColor:css('--surface'),tension:.25});
+  const tds=[line('Revenue',tot.map(t=>t.rev),css('--slate')),line('Gross profit',tot.map(t=>t.gp),css('--brand'),2.5),line('Cost',tot.map(t=>t.cost),css('--fg3'))];
+  tds[1].fill={target:'origin'};tds[1].backgroundColor=css('--brand-soft');
+  setNoData('trend',tot.every(x=>!x.rev&&!x.subs&&!x.cost),`No data for ${selText()} in this period.`);
+  const o1=baseOpts((v,ax)=>ax?fk(v):fm(v));o1.plugins.selBand={idx:selI};
+  trendC=mkChart(trendC,'trend',{type:'line',data:{labels,datasets:tds},options:o1,plugins:[selBand]});
+
+  const key=st.metric;const fmtM=key==='subs'?(v=>fn(v)):(v,ax)=>ax?fk(v):fm(v);
+  const mk=MORDER.filter(m=>st.mk.has(m));
+  const mds=mk.map(m=>{const mi=M.indexOf(m);return{label:m,data:idx.map(i=>{const a=agg(r=>r[0]===i&&r[1]===mi&&passX(r));return a[key]}),backgroundColor:mcol(m),borderColor:css('--surface'),borderWidth:{top:2,bottom:0,left:0,right:0},borderRadius:0,borderSkipped:false,maxBarThickness:28}});
+  setNoData('bymarket',mds.every(d=>d.data.every(v=>!v)),`No data for ${selText()} in this period.`);
+  const o2=baseOpts(fmtM);o2.scales.x.stacked=true;o2.scales.y.stacked=true;o2.plugins.selBand={idx:selI};
+  o2.plugins.tooltip.callbacks.footer=items=>'Total: '+fmtM(items.reduce((s,i)=>s+i.parsed.y,0));
+  o2.plugins.tooltip.footerColor=css('--fg');
+  mktC=mkChart(mktC,'bymarket',{type:'bar',data:{labels,datasets:mds},options:o2,plugins:[selBand]});
+  $('#mlegend').innerHTML=mk.map(m=>`<span><i style="background:${mcol(m)}"></i>${m}</span>`).join('');
+}
+
+function renderSubs(){
+  const start=Math.max(0,D.length-st.range);const n=D.length-start;
+  const z=()=>new Array(n).fill(0);
+  const byM={},byT={},act=z(),slp=z(),tot=z();MORDER.forEach(m=>byM[m]=z());T.forEach(x=>byT[x]=z());
+  const cm={},cmPrev={};MORDER.forEach(m=>{cm[m]={t:{},s:0,sl:0};cmPrev[m]=0});
+  for(const r of R){if(!pass(r))continue;const m=M[r[1]],s=r[4];
+    if(r[0]>=start){const i=r[0]-start;byM[m][i]+=s;byT[T[r[2]]][i]+=s;tot[i]+=s;if(r[5]>0)act[i]+=s;else slp[i]+=s}
+    if(r[0]===st.month){const c=cm[m];c.s+=s;c.t[T[r[2]]]=(c.t[T[r[2]]]||0)+s;if(r[5]===0)c.sl+=s}
+    if(r[0]===st.cmp)cmPrev[m]+=s}
+  const labels=[];for(let i=start;i<D.length;i++)labels.push(mls(i));
+  const selI=st.month-start;
+  const line=(label,data,col)=>({label,data,borderColor:col,backgroundColor:col,borderWidth:2,pointRadius:0,pointHoverRadius:5,pointHoverBorderWidth:2,pointHoverBorderColor:css('--surface'),tension:.25});
+  const bar=(label,data,col)=>({label,data,backgroundColor:col,borderColor:css('--surface'),borderWidth:{top:2,bottom:0,left:0,right:0},borderSkipped:false,maxBarThickness:28});
+  const mk=MORDER.filter(m=>st.mk.has(m));
+  let type='line',ds,leg;
+  if(st.sview==='market'){ds=mk.map(m=>line(m,byM[m],mcol(m)));leg=mk.map(m=>[m,mcol(m),1])}
+  else if(st.sview==='type'){const cols=[css('--slate'),css('--brand')];ds=T.map((x,i)=>line(x,byT[x],cols[i%2]));leg=T.map((x,i)=>[x,cols[i%2],1])}
+  else{type='bar';ds=[bar('Using minutes',act,css('--slate')),bar('Zero minutes (sleeping)',slp,css('--sleep'))];leg=[['Using minutes',css('--slate')],['Zero minutes (sleeping)',css('--sleep')]]}
+  $('#slegend').innerHTML=leg.map(([l,c,ln])=>`<span><i class="${ln?'ln':''}" style="background:${c}"></i>${l}</span>`).join('');
+  const o=baseOpts(v=>fn(v));o.plugins.selBand={idx:selI};
+  if(type==='bar'){o.scales.x.stacked=true;o.scales.y.stacked=true;o.plugins.tooltip.callbacks.footer=it=>'Total: '+fn(it.reduce((s,i)=>s+i.parsed.y,0));o.plugins.tooltip.footerColor=css('--fg')}
+  setNoData('subchart',tot.every(v=>!v),`No subscribers for ${selText()} in this period.`);
+  subC=mkChart(subC,'subchart',{type,data:{labels,datasets:ds},options:o,plugins:[selBand]});
+  // stats
+  const curT=mk.reduce((s,m)=>s+cm[m].s,0),prevT=mk.reduce((s,m)=>s+cmPrev[m],0),sl=mk.reduce((s,m)=>s+cm[m].sl,0);
+  const net=curT-prevT,hasCmp=st.cmp>=0;
+  const peakI=tot.indexOf(Math.max(...tot));
+  const yago=st.month-12;let ya=0;if(yago>=0)for(const r of R)if(r[0]===yago&&pass(r))ya+=r[4];
+  const sg=v=>`<span class="${v>=0?'up':'down'}">${v>0?'+':v<0?'−':''}${fn(Math.abs(v))}</span>`;
+  $('#substats').innerHTML=`<div class="stat"><span class="lbl">Subscribers ${mls(st.month)}</span><b>${fn(curT)}</b></div>
+   <div class="stat"><span class="lbl">Net change</span><b>${hasCmp?sg(net):'–'}</b><span class="note">${hasCmp?(prevT?((net/prevT)*100).toFixed(1)+'% vs '+mls(st.cmp):'vs '+mls(st.cmp)):''}</span></div>
+   <div class="stat"><span class="lbl">vs a year earlier</span><b>${yago>=0&&ya?sg(curT-ya):'–'}</b><span class="note">${yago>=0&&ya?((curT-ya)/ya*100).toFixed(1)+'% vs '+mls(yago):'no data a year earlier'}</span></div>
+   <div class="stat"><span class="lbl">Sleeping</span><b>${fn(sl)}</b><span class="note">${curT?fp(sl/curT)+' of subscribers':''}</span></div>
+   <div class="stat"><span class="lbl">Peak in view</span><b>${tot[peakI]?fn(tot[peakI]):'–'}</b><span class="note">${tot[peakI]?labels[peakI]:''}</span></div>`;
+  // table market x type
+  const ch=(a,b)=>!hasCmp?'–':`<span class="${a>=b?'up':'down'}">${a-b>0?'+':a-b<0?'−':''}${fn(Math.abs(a-b))}</span>`;
+  const tt={};T.forEach(x=>tt[x]=0);
+  $('#subtable').innerHTML=`<thead><tr><th>Market</th>${T.map(x=>`<th>${x}</th>`).join('')}<th>Total</th><th>Change</th><th>Sleeping</th></tr></thead><tbody>`+
+   mk.map(m=>{const c=cm[m];T.forEach(x=>tt[x]+=c.t[x]||0);return `<tr><td class="name"><span class="mk" style="background:${mcol(m)}"></span>${m}</td>${T.map(x=>`<td>${fn(c.t[x]||0)}</td>`).join('')}<td>${fn(c.s)}</td><td>${ch(c.s,cmPrev[m])}</td><td>${c.s?fp(c.sl/c.s):'–'}</td></tr>`}).join('')+
+   `</tbody><tfoot><tr><td>Total</td>${T.map(x=>`<td>${fn(tt[x])}</td>`).join('')}<td>${fn(curT)}</td><td>${ch(curT,prevT)}</td><td>${curT?fp(sl/curT):'–'}</td></tr></tfoot>`;
+  // movers
+  if(!prev){$('#movers').innerHTML='<p class="note">Pick a comparison month to see which packages gained or lost subscribers.</p>';return}
+  const ids=new Set([...cur.keys(),...prev.keys()]);const mv=[];
+  for(const p of ids){const a=cur.get(p),b=prev.get(p);const d=(a?a.subs:0)-(b?b.subs:0);if(d)mv.push([p,d])}
+  mv.sort((x,y)=>y[1]-x[1]);
+  const li=([p,d])=>`<li tabindex="0" data-p="${p}" title="${P[p]}"><span>${P[p]}</span><span class="${d>0?'up':'down'}">${d>0?'+':'−'}${fn(Math.abs(d))}</span></li>`;
+  const up=mv.filter(x=>x[1]>0).slice(0,6),dn=mv.filter(x=>x[1]<0).reverse().slice(0,6);
+  $('#movers').innerHTML=`<div><h3>Biggest gains vs ${mls(st.cmp)}</h3><ol>${up.map(li).join('')||'<li>None</li>'}</ol></div><div><h3>Biggest losses vs ${mls(st.cmp)}</h3><ol>${dn.map(li).join('')||'<li>None</li>'}</ol></div>`;
+  document.querySelectorAll('#movers li[data-p]').forEach(el=>{const go=()=>openPkg(+el.dataset.p);el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter')go()}});
+}
+function renderMarkets(){
+  const rows=MORDER.filter(m=>st.mk.has(m)).map(m=>{const mi=M.indexOf(m);const f=i=>agg(r=>r[0]===i&&r[1]===mi&&passX(r));const a=f(st.month),b=st.cmp>=0?f(st.cmp):null;return{m,a,b}});
+  const tot=agg(r=>r[0]===st.month&&pass(r));
+  const ch=(a,b)=>!b?'<span>–</span>':`<span class="${a>=b?'up':'down'}">${a>=b?'+':''}${((a-b)/Math.abs(b)*100).toFixed(1)}%</span>`;
+  $('#mnote').textContent=ml(st.month)+(st.cmp>=0?' · change vs '+ml(st.cmp):'');
+  $('#mtable').innerHTML=`<thead><tr><th>Market</th><th>Revenue</th><th>Share</th><th>Gross profit</th><th>Margin</th><th>Subs</th><th>ARPU</th><th>Rev. change</th></tr></thead><tbody>`+
+   rows.map(({m,a,b})=>`<tr><td class="name"><span class="mk" style="background:${mcol(m)}"></span>${m}</td><td>${fm(a.rev)}</td><td>${fp(a.rev/tot.rev)}</td><td>${fm(a.gp)}</td><td>${fp(a.gp/a.rev)}</td><td>${fn(a.subs)}</td><td>${a.subs?f2(a.rev/a.subs):'–'}</td><td>${ch(a.rev,b&&b.rev)}</td></tr>`).join('')+
+   `</tbody><tfoot><tr><td>Total</td><td>${fm(tot.rev)}</td><td>100%</td><td>${fm(tot.gp)}</td><td>${fp(tot.gp/tot.rev)}</td><td>${fn(tot.subs)}</td><td>${f2(tot.rev/tot.subs||0)}</td><td></td></tr></tfoot>`;
+}
+
+let cur,prev;
+const isSleep=o=>o.subs>0&&o.min===0;
+function renderSleep(){
+  const s=[...cur.values()].filter(isSleep).sort((a,b)=>b.subs-a.subs);
+  const subs=s.reduce((x,o)=>x+o.subs,0),rev=s.reduce((x,o)=>x+o.rev,0);
+  const allSubs=[...cur.values()].reduce((x,o)=>x+o.subs,0);
+  $('#sleepstats').innerHTML=`<div class="stat"><span class="lbl">Packages</span><b>${s.length}</b></div><div class="stat"><span class="lbl">Subscribers</span><b>${fn(subs)}</b><span class="note">${fp(subs/allSubs)} of all</span></div><div class="stat"><span class="lbl">Revenue</span><b>${fm(rev)}</b><span class="note">nearly all profit</span></div>`;
+  $('#sleeptable').innerHTML=s.length?`<thead><tr><th>Package</th><th>Market</th><th>Subs</th><th>Revenue</th></tr></thead><tbody>`+s.slice(0,8).map(o=>`<tr class="click" tabindex="0" data-p="${o.p}"><td class="name" title="${P[o.p]}">${P[o.p]}</td><td style="font-family:var(--body)">${[...o.mk].map(i=>M[i]).join(', ')}</td><td>${fn(o.subs)}</td><td>${fm(o.rev)}</td></tr>`).join('')+'</tbody>'+(s.length>8?`<tfoot><tr><td colspan="4" style="text-align:left;font-family:var(--body);font-weight:400;color:var(--fg3)">+ ${s.length-8} more · filter the package table by “Sleeping” to see all</td></tr></tfoot>`:''):'<tbody><tr><td class="empty">No sleeping packages for this selection.</td></tr></tbody>';
+  bindRows('#sleeptable');
+}
+
+const COLS=[['name','Package'],['mk','Market'],['subs','Subs'],['dsubs','Subs Δ'],['min','Minutes'],['avgmin','Min/sub'],['rev','Revenue'],['drev','Rev. Δ'],['cost','Cost'],['gp','Gross profit'],['mg','Margin'],['arpu','ARPU']];
+function renderPkgs(){
+  let list=[...cur.values()].map(o=>{const p=prev&&prev.get(o.p);return Object.assign(o,{name:P[o.p],mkn:[...o.mk].map(i=>M[i]).join(', '),avgmin:o.subs?o.min/o.subs:0,mg:o.rev?o.gp/o.rev:-Infinity,arpu:o.subs?o.rev/o.subs:0,psubs:p?p.subs:null,prev:p?p.rev:null,dsubs:p?o.subs-p.subs:null,drev:p?o.rev-p.rev:null,isNew:prev&&!p})});
+  if(st.q)list=list.filter(o=>o.name.toLowerCase().includes(st.q));
+  if(st.flag==='loss')list=list.filter(o=>o.gp<0);
+  if(st.flag==='low')list=list.filter(o=>o.rev>0&&o.gp/o.rev<.6);
+  if(st.flag==='sleep')list=list.filter(isSleep);
+  if(st.flag==='new')list=list.filter(o=>o.isNew);
+  const k=st.sort==='mk'?'mkn':st.sort;
+  list.sort((a,b)=>{const x=a[k],y=b[k];if(typeof x==='string')return st.dir*x.localeCompare(y);return st.dir*((x??-Infinity)-(y??-Infinity))});
+  const maxRev=Math.max(1,...list.map(o=>o.rev));
+  const sgn=(v,f)=>v==null?'<span style="color:var(--fg3)">–</span>':`<span class="${v>=0?'up':'down'}">${v>0?'+':v<0?'−':''}${f(Math.abs(v))}</span>`;
+  const pills=o=>(o.gp<0?'<span class="pill p-loss">Loss</span>':'')+(isSleep(o)?'<span class="pill p-sleep">Sleeping</span>':'')+(o.rev>0&&o.gp>=0&&o.gp/o.rev<.6?'<span class="pill p-low">Low margin</span>':'')+(o.isNew?'<span class="pill p-new">New</span>':'');
+  const head=`<thead><tr>${COLS.map(([c,l])=>`<th class="s" tabindex="0" data-c="${c}" ${st.sort===c?`aria-sort="${st.dir<0?'descending':'ascending'}"`:''}>${l}</th>`).join('')}</tr></thead>`;
+  const body=list.slice(0,st.limit).map(o=>`<tr class="click${st.pkg===o.p?' sel':''}" tabindex="0" data-p="${o.p}"><td class="name" title="${o.name}">${o.name}${pills(o)}</td><td style="font-family:var(--body)">${[...o.mk].map(i=>`<span class="mk" style="background:${mcol(M[i])}"></span>`).join('')}${o.mkn}</td><td>${fn(o.subs)}</td><td>${sgn(o.dsubs,fn)}</td><td>${fn(o.min)}</td><td>${o.avgmin.toFixed(0)}</td><td>${fm(o.rev)}<span class="bar" style="width:${Math.round(o.rev/maxRev*48)}px"></span></td><td>${sgn(o.drev,fm)}</td><td>${fm(o.cost)}</td><td class="${o.gp<0?'down':''}">${fm(o.gp)}</td><td>${o.rev?fp(o.gp/o.rev):'–'}</td><td>${o.subs?f2(o.arpu):'–'}</td></tr>`).join('');
+  const t=list.reduce((a,o)=>(a.s+=o.subs,a.m+=o.min,a.r+=o.rev,a.c+=o.cost,a),{s:0,m:0,r:0,c:0});
+  const foot=list.length?`<tfoot><tr><td>${list.length} packages</td><td></td><td>${fn(t.s)}</td><td></td><td>${fn(t.m)}</td><td></td><td>${fm(t.r)}</td><td></td><td>${fm(t.c)}</td><td>${fm(t.r-t.c)}</td><td>${fp((t.r-t.c)/t.r)}</td><td>${t.s?f2(t.r/t.s):'–'}</td></tr></tfoot>`:'';
+  $('#ptable').innerHTML=head+'<tbody>'+(body||`<tr><td class="empty" colspan="${COLS.length}">No packages match. Clear the search or pick “All packages”.</td></tr>`)+'</tbody>'+foot;
+  const mb=$('#more');mb.hidden=list.length<=st.limit;mb.textContent=`Show more (${list.length-st.limit} left)`;
+  document.querySelectorAll('#ptable th.s').forEach(th=>{const go=()=>{const c=th.dataset.c;if(st.sort===c)st.dir*=-1;else{st.sort=c;st.dir=(c==='name'||c==='mk')?1:-1}renderPkgs()};th.onclick=go;th.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}});
+  bindRows('#ptable');
+}
+function bindRows(sel){document.querySelectorAll(sel+' tr.click').forEach(tr=>{const go=()=>openPkg(+tr.dataset.p);tr.onclick=go;tr.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}}})}
+
+function openPkg(p,scroll=true){
+  st.pkg=p;const det=$('#detail');det.hidden=false;$('#dtitle').textContent=P[p];
+  const series=D.map((_,i)=>agg(r=>r[0]===i&&r[3]===p&&pass(r)));
+  let first=series.findIndex(s=>s.subs>0);if(first<0)first=0;
+  const idx=[];for(let i=first;i<D.length;i++)idx.push(i);
+  const s=idx.map(i=>series[i]);
+  const line=(label,data,col,ax='y')=>({label,data,yAxisID:ax,borderColor:col,backgroundColor:col,borderWidth:2,pointRadius:0,pointHoverRadius:5,tension:.25});
+  const o=baseOpts((v,ax)=>ax?fk(v):fm(v));
+  o.scales.y1={position:'right',beginAtZero:true,grid:{display:false},border:{display:false},ticks:{color:css('--fg3'),maxTicksLimit:5,callback:v=>fn(v)}};
+  o.plugins.tooltip.callbacks.label=c=>' '+c.dataset.label+': '+(c.dataset.yAxisID==='y1'?fn(c.parsed.y):fm(c.parsed.y));
+  o.plugins.selBand={idx:idx.indexOf(st.month)};
+  detC=mkChart(detC,'dchart',{type:'line',data:{labels:idx.map(mls),datasets:[line('Revenue',s.map(x=>x.rev),css('--slate')),line('Gross profit',s.map(x=>x.gp),css('--brand')),line('Subscribers',s.map(x=>x.subs),css('--c-hispanic'),'y1')]},options:o,plugins:[selBand]});
+  const tot=s.reduce((a,x)=>(a.r+=x.rev,a.g+=x.gp,a.s=Math.max(a.s,x.subs),a),{r:0,g:0,s:0});
+  $('#dnote').textContent=`Since ${ml(first)}: ${fm(tot.r)} revenue, ${fm(tot.g)} gross profit (${fp(tot.g/tot.r)} margin). Peak subscribers ${fn(tot.s)}. Uses the market and type filters above.`;
+  renderPkgs();
+  if(scroll)det.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});
+}
+
+
+function selText(){const p=[];if(st.vn)p.push(st.vn==='vn'?'Vnumber':'Non-Vnumber');if(st.type)p.push(st.type);p.push(st.mk.size===MORDER.length?'any market':[...st.mk].join(', '));return p.join(' · ')}
+function resetFilters(){st.vn='';st.type='';st.mk=new Set(MORDER);tsel.value='';document.querySelectorAll('#vn button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===''));document.querySelectorAll('#markets .chip').forEach(b=>b.setAttribute('aria-pressed','true'));render()}
+function setNoData(canvas,on,msg){const o=document.getElementById(canvas).parentElement.querySelector('.nodata');o.hidden=!on;if(on)o.innerHTML=`<span>${msg}</span><button class="reset" type="button">Reset filters</button>`,o.querySelector('button').onclick=resetFilters}
+function syncOptions(){
+  const any=f=>R.some(f);
+  const mOK=r=>st.mk.has(M[r[1]]);
+  [...tsel.options].forEach(o=>{if(!o.value)return;const ok=any(r=>mOK(r)&&T[r[2]]===o.value&&(st.vn===''||(st.vn==='vn')===VN[r[3]]));o.disabled=!ok&&st.type!==o.value;o.textContent=o.dataset.l+(ok?'':' (no data)')});
+  document.querySelectorAll('#vn button').forEach(b=>{const v=b.dataset.v;if(!v){b.disabled=false;return}const ok=any(r=>mOK(r)&&(st.type===''||T[r[2]]===st.type)&&(v==='vn')===VN[r[3]]);b.disabled=!ok&&st.vn!==v;b.title=ok?'':'No data for the current type and markets'});
+  document.querySelectorAll('#markets .chip').forEach(b=>{const mi=M.indexOf(b.dataset.m);const ok=any(r=>r[1]===mi&&passX(r));b.title=ok?'':'No data for the current package and type filters'});
+  const all=any(pass),month=any(r=>r[0]===st.month&&pass(r));
+  const bn=$('#banner');
+  if(!all){bn.hidden=false;bn.innerHTML=`<span>No data matches ${selText()}. For example, all Vnumber packages are Monthly.</span><button class="reset" type="button">Reset filters</button>`;bn.querySelector('button').onclick=resetFilters}
+  else if(!month){const f=R.filter(pass).reduce((m,r)=>Math.min(m,r[0]),1e9);bn.hidden=false;bn.innerHTML=`<span>No data for ${selText()} in ${ml(st.month)}. The first month with data is ${ml(f)}.</span><button class="reset" type="button">Go to ${ml(D.length-1)}</button>`;bn.querySelector('button').onclick=()=>{st.month=D.length-1;st.cmp=st.month-1;msel.value=st.month;csel.value=st.cmp;render()}}
+  else bn.hidden=true;
+}
+function render(){
+  syncOptions();cur=byPkg(st.month);prev=st.cmp>=0?byPkg(st.cmp):null;
+  [renderKpis,renderCharts,renderMarkets,renderSleep,renderSubs,renderPkgs].forEach(f=>{try{f()}catch(e){console.error(f.name,e)}});
+  if(st.pkg!=null)openPkg(st.pkg,false);
+}
+render();
+};
+</script>
+
+<div id="toast" hidden></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDocs, writeBatch, serverTimestamp, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// Same Firebase project and login as index.html. Sales data lives in
+// mkt_sales/{YYYY-MM} (one document per month) and mkt_salesMeta/last; it is
+// never committed to the repo.
+const app = initializeApp({
+  apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
+  authDomain: "telecom-deals-f155b.firebaseapp.com",
+  projectId: "telecom-deals-f155b",
+  storageBucket: "telecom-deals-f155b.firebasestorage.app",
+  messagingSenderId: "182881118188",
+  appId: "1:182881118188:web:9d2f09995f7a1393f942c9"
+});
+const auth = getAuth(app), db = getFirestore(app);
+const ALLOWED = ['@011global.com','@011telecom.com'];
+const allowedEmail = e => ALLOWED.some(d => (e || '').toLowerCase().endsWith(d));
+// Local-only preview (?preview on localhost): no sign-in, data from a gitignored
+// sales-preview.json, uploads stay in memory.
+const LOCAL_PREVIEW = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('preview');
+const $ = id => document.getElementById(id);
+let toastT;
+const toast = m => { const el = $('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 5000); };
+const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const monthName = k => { const [y, m] = k.split('-'); return MN[+m - 1] + ' ' + y; };
+
+function gate(html){ $('app').hidden = true; const g = $('gate'); g.hidden = false; g.innerHTML = html; }
+
+// Rows per month: [market, type, package, subscribers, minutes, charged, cost]
+function toDATA(months){
+  const D = Object.keys(months).sort(), M = new Set(), T = new Set(['Monthly','Prepaid']), P = new Set();
+  for (const k of D) for (const r of months[k]) { M.add(r[0]); T.add(r[1]); P.add(r[2]); }
+  const m = [...M].sort(), t = [...T], p = [...P].sort();
+  const mi = new Map(m.map((v,i)=>[v,i])), ti = new Map(t.map((v,i)=>[v,i])), pi = new Map(p.map((v,i)=>[v,i]));
+  const rows = [];
+  D.forEach((k, di) => { for (const r of months[k]) rows.push([di, mi.get(r[0]), ti.get(r[1]), pi.get(r[2]), r[3], r[4], r[5], r[6]]); });
+  return { d: D, m, t, p, r: rows };
+}
+
+// Reads the report workbook. Same rules as before: Bglobal = BGlobal, both
+// renewal types count as Monthly.
+function parseWorkbook(buf){
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  const name = wb.SheetNames.find(n => n.startsWith('PackagesProfitability'));
+  if (!name) throw new Error('This file has no PackagesProfitability tab. Upload the monthly Package Profitability report.');
+  const json = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: null });
+  const need = ['Date','Market','Type','Package Name','Subscribers','Minutes','Charged','Cost'];
+  const miss = need.filter(c => !json.length || !(c in json[0]));
+  if (miss.length) throw new Error('The PackagesProfitability tab is missing these columns: ' + miss.join(', ') + '.');
+  const months = {}, num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,]/g, '')); return isFinite(n) ? n : 0; };
+  for (const x of json) {
+    let d = x.Date; if (!d) continue;
+    if (!(d instanceof Date)) d = new Date(d);
+    if (isNaN(d)) continue;
+    d = new Date(d.getTime() + 12 * 3600e3);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    let mk = String(x.Market ?? '').trim(); if (mk.toLowerCase() === 'bglobal') mk = 'BGlobal';
+    let ty = String(x.Type ?? '').trim(); if (ty.startsWith('Renewal')) ty = 'Monthly';
+    const pk = String(x['Package Name'] ?? '').trim();
+    if (!mk || !pk) continue;
+    (months[key] ||= []).push([mk, ty, pk, Math.round(num(x.Subscribers)), Math.round(num(x.Minutes)), Math.round(num(x.Charged) * 100) / 100, Math.round(num(x.Cost) * 100) / 100]);
+  }
+  if (!Object.keys(months).length) throw new Error('No rows with a date were found in the PackagesProfitability tab.');
+  return months;
+}
+window.__parseWorkbook = parseWorkbook;
+
+function start(DATA, meta){
+  $('gate').hidden = true; $('app').hidden = false;
+  const last = DATA.d[DATA.d.length - 1];
+  $('srcnote').textContent = meta ? `Data through ${monthName(last)} · uploaded ${meta.at ? meta.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}${meta.by ? ' by ' + meta.by : ''}` : `Data through ${monthName(last)}`;
+  window.startDashboard(DATA);
+}
+
+async function loadLive(){
+  const [snap, metaSnap] = await Promise.all([getDocs(collection(db, 'mkt_sales')), getDoc(doc(db, 'mkt_salesMeta', 'last')).catch(() => null)]);
+  const months = {};
+  snap.forEach(d => { if (/^\d{4}-\d{2}$/.test(d.id)) months[d.id] = JSON.parse(d.data().rows); });
+  const m = metaSnap && metaSnap.exists() ? metaSnap.data() : null;
+  return { months, meta: m ? { by: m.by, at: m.at?.toDate?.() } : null };
+}
+
+async function upload(file){
+  const btn = $('upload'); btn.disabled = true; btn.textContent = 'Reading…';
+  try {
+    const months = parseWorkbook(await file.arrayBuffer());
+    const keys = Object.keys(months).sort();
+    if (LOCAL_PREVIEW) { toast(`Read ${keys.length} months (local preview — not saved)`); start(toDATA(months), null); return; }
+    btn.textContent = 'Saving…';
+    const by = auth.currentUser?.displayName || auth.currentUser?.email || '';
+    for (let i = 0; i < keys.length; i += 400) {
+      const b = writeBatch(db);
+      keys.slice(i, i + 400).forEach(k => b.set(doc(db, 'mkt_sales', k), { month: k, rows: JSON.stringify(months[k]), rowCount: months[k].length, source: file.name, uploadedBy: by, uploadedAt: serverTimestamp() }));
+      await b.commit();
+    }
+    await setDoc(doc(db, 'mkt_salesMeta', 'last'), { by, at: serverTimestamp(), file: file.name, from: keys[0], to: keys[keys.length - 1] });
+    toast(`Saved ${keys.length} months, ${monthName(keys[0])} to ${monthName(keys[keys.length - 1])}. Reloading…`);
+    setTimeout(() => location.reload(), 1200);
+  } catch (e) {
+    console.error(e);
+    const denied = /permission|insufficient/i.test(e.message || '');
+    toast(denied ? 'Firestore refused the save. The security rules need to allow the mkt_sales and mkt_salesMeta collections.' : e.message);
+  } finally { btn.disabled = false; btn.textContent = 'Upload monthly report'; }
+}
+
+function wire(){
+  $('upload').onclick = () => $('file').click();
+  $('file').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) upload(f); };
+  $('signout').onclick = async () => { if (LOCAL_PREVIEW) { location.search = ''; return; } await signOut(auth); location.href = 'index.html'; };
+}
+
+function emptyState(){
+  gate(`<h1>Sales</h1><p>No sales report has been uploaded yet. Upload the monthly Package Profitability workbook (.xlsx) to fill this page. It includes the full history, so one upload covers every month.</p><button class="btn primary" type="button" id="upload2">Upload monthly report</button>`);
+  $('upload2').onclick = () => $('file').click();
+}
+
+wire();
+if (LOCAL_PREVIEW) {
+  $('user-display').textContent = 'Local preview';
+  fetch('sales-preview.json').then(r => r.ok ? r.json() : null).then(d => d ? start(d, null) : emptyState()).catch(emptyState);
+} else onAuthStateChanged(auth, async user => {
+  if (!user || !allowedEmail(user.email)) { gate(`<h1>Sign in to see sales</h1><p>Sales figures are for 011 Global and 011 Telecom staff. Sign in on the marketing dashboard, then come back here.</p><a class="btn primary" href="index.html">Go to sign in</a>`); return; }
+  $('user-display').textContent = user.displayName || user.email;
+  gate('<p>Loading sales…</p>');
+  try {
+    const { months, meta } = await loadLive();
+    if (!Object.keys(months).length) { emptyState(); return; }
+    start(toDATA(months), meta);
+  } catch (e) {
+    console.error(e);
+    gate(`<h1>Sales could not load</h1><p>${/permission|insufficient/i.test(e.message || '') ? 'Firestore refused access. The security rules need to allow signed-in staff to read the mkt_sales collection.' : 'Something went wrong while loading. Reload the page to try again.'}</p>`);
+  }
+});
+</script>
+</body>
+</html>
