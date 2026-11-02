@@ -78,6 +78,10 @@ Two pages outside the hash router, sharing `sales.css` and `sales-data.js`
   sleeping = subscribers with zero minutes.
 - Local preview: `sales.html?preview` / `vnumber.html?preview` read a gitignored
   `test-report.xlsx` placed next to them; uploads stay in memory.
+- **Download PDF** (`report-pdf.js`, both pages): captures `#app` section by
+  section exactly as filtered on screen (html2canvas + jsPDF, loaded on first
+  click), at a fixed 1400px layout (`body.pdf` rules in `sales.css`), onto A4
+  landscape pages with a header/footer; long tables continue across pages.
 - Planned: a sales API sync (like `sync/AdsSync.gs`) writing the same collections.
 
 ## Platforms

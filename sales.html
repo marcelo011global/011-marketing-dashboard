@@ -38,6 +38,7 @@
     </div>
     <div class="upload">
       <p class="note" id="srcnote"></p>
+      <button class="btn" type="button" id="pdf" data-report="Sales report">Download PDF</button>
       <button class="btn primary" type="button" id="upload">Upload monthly report</button>
     </div>
   </header>
@@ -114,6 +115,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="report-pdf.js"></script>
 <script>
 window.startDashboard=function(DATA){
 const D=DATA.d,M=DATA.m,T=DATA.t,P=DATA.p,R=DATA.r;
