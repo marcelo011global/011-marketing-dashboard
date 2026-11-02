@@ -21,6 +21,14 @@
   async function build(btn){
     const title = btn.dataset.report || document.title;
     const sel = document.getElementById('month'), month = sel?.selectedOptions[0]?.text.replace(/\s+/g, '-') || '';
+    // Filters that differ from the default go into the file name, so differently filtered reports don't collide.
+    const tag = [];
+    const vn = document.querySelector('#vn button[aria-pressed="true"]'); if (vn && vn.dataset.v) tag.push(vn.textContent);
+    const ty = document.getElementById('type'); if (ty && ty.value) tag.push(ty.value);
+    const chips = [...document.querySelectorAll('#markets .chip')], on = chips.filter(c => c.getAttribute('aria-pressed') === 'true');
+    if (chips.length && on.length < chips.length) tag.push(on.map(c => c.dataset.m).join('-'));
+    const flag = document.getElementById('flag'); if (flag && flag.value) tag.push(flag.selectedOptions[0].text);
+    const q = document.getElementById('q'); if (q && q.value.trim()) tag.push('search-' + q.value.trim());
     const label = btn.textContent; btn.disabled = true; btn.textContent = 'Preparing PDF…';
     try {
       for (const src of LIBS) await load(src);
@@ -47,7 +55,11 @@
       const newPage = () => { pdf.addPage(); page++; y = top; chrome(); };
       for (const el of blocks) {
         btn.textContent = `Preparing PDF… ${Math.round((blocks.indexOf(el) / blocks.length) * 100)}%`;
+        // Row and panel edges, so a page break never cuts through a table row.
+        const top0 = el.getBoundingClientRect().top;
+        const edges = [...el.querySelectorAll('tr, .panel, .ph, .detail')].map(n => n.getBoundingClientRect().bottom - top0);
         const canvas = await html2canvas(el, { scale: 2, backgroundColor: bg, logging: false, useCORS: true });
+        const k = canvas.height / el.offsetHeight, cuts = edges.map(e => Math.round(e * k)).sort((a, b) => a - b);
         const mmPerPx = cw / canvas.width, hmm = canvas.height * mmPerPx;
         if (hmm <= ch) {
           if (y + hmm > top + ch) newPage();
@@ -58,7 +70,9 @@
           if (y > top + 20) newPage();
           let sy = 0;
           while (sy < canvas.height) {
-            const room = top + ch - y, sh = Math.min(canvas.height - sy, Math.floor(room / mmPerPx));
+            const room = top + ch - y, max = Math.min(canvas.height - sy, Math.floor(room / mmPerPx));
+            const edge = sy + max >= canvas.height ? null : cuts.filter(c => c > sy + max * 0.5 && c <= sy + max).pop();
+            const sh = edge ? edge - sy : max;
             const part = document.createElement('canvas'); part.width = canvas.width; part.height = sh;
             part.getContext('2d').drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh);
             pdf.addImage(part.toDataURL('image/jpeg', 0.9), 'JPEG', M, y, cw, sh * mmPerPx);
@@ -67,7 +81,7 @@
           }
         }
       }
-      const name = `${title.replace(/[^A-Za-z0-9]+/g, '-')}${month ? '-' + month : ''}.pdf`;
+      const name = [title, month, ...tag].filter(Boolean).join(' ').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.pdf';
       pdf.save(name);
       toast(`Downloaded ${name}`);
     } catch (e) {

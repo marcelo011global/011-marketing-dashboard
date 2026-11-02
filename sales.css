@@ -122,3 +122,4 @@ body.pdf th{position:static}
 body.pdf th,body.pdf td{padding:6px 6px}
 body.pdf td{font-size:12px}
 body.pdf td.name{max-width:260px}
+body.pdf input[type=search]:placeholder-shown{display:none}
