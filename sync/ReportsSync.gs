@@ -15,15 +15,159 @@
  * Date ranges are Eastern calendar dates, inclusive, max 366 days. Responses are
  * cached 30 minutes. Bad key → 401; validation errors → HTTP 200 with success:false.
  *
- * Step 1 (now): run probe() and paste the log back. It prints each endpoint's
- * structure (field names, types, row counts, and the values of low-cardinality
- * fields such as market or package) without printing personal data.
+ * Writes one Firestore doc per month per report, AGGREGATED — no names, phone
+ * numbers, customer IDs or other personal fields are stored:
+ *   mkt_sales/{YYYY-MM}   packages-profitability, same rows as the Sales page's xlsx
+ *                         upload: [market, type, package, subscribers, minutes, charged, cost, didCost]
+ *   mkt_vnEnroll/{YYYY-MM} VNUMBER enrollments, counted by day × DID country × origin country ×
+ *                         package × creator × status × language × promo code
+ *   mkt_subs/{YYYY-MM}    new subscribers, counted by day × plan × agent × creator × status × auto top-up
+ *   mkt_mr/{YYYY-MM}      mobile-recharge revenue by day × market × rep (already aggregated by the API)
+ *   mkt_sims/{YYYY-MM}    SIM activations by day × plan × creator × shipping type × coupon
+ * Each doc: {month, cols: JSON header, rows: JSON rows, rowCount, source:'reports-api', syncedAt}.
+ *
+ * Entry points: backfill() (last 12 months + this month), dailySync() (this month and last),
+ * installDailyTrigger() (run once, ~4am), probe() (shape only, for checking the API).
  */
 
 var REPORTS = {
   BASE: 'https://hub.011global.com/api/externalreports/',
   KEY: PropertiesService.getScriptProperties().getProperty('REPORTS_API_KEY'),
+  FIRESTORE: 'projects/telecom-deals-f155b/databases/(default)/documents',
+  TZ: 'America/New_York',   // the API's calendar dates are Eastern
 };
+
+// ───────────────────────── Entry points ─────────────────────────
+function backfill() { requireScopes_(); monthsBack_(12).forEach(syncMonth_); }
+function dailySync() { requireScopes_(); monthsBack_(1).forEach(syncMonth_); }
+
+function installDailyTrigger() {
+  requireScopes_();
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'dailySync') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('dailySync').timeBased().everyDays(1).atHour(4).create();
+}
+
+function requireScopes_() { ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL); }
+
+// The current month and the n months before it, oldest first, as {key:'YYYY-MM', y, m, from, to}.
+function monthsBack_(n) {
+  var now = new Date(), today = Utilities.formatDate(now, REPORTS.TZ, 'yyyy-MM-dd');
+  var y = +today.slice(0, 4), m = +today.slice(5, 7), out = [];
+  for (var i = n; i >= 0; i--) {
+    var yy = y, mm = m - i;
+    while (mm < 1) { mm += 12; yy--; }
+    var key = yy + '-' + ('0' + mm).slice(-2);
+    var last = new Date(yy, mm, 0).getDate();
+    var to = key + '-' + ('0' + last).slice(-2);
+    out.push({ key: key, y: yy, m: mm, from: key + '-01', to: to > today ? today : to });
+  }
+  return out;
+}
+
+// ───────────────────────── Sync one month ─────────────────────────
+function syncMonth_(p) {
+  if (!REPORTS.KEY) throw new Error('Set REPORTS_API_KEY in Project Settings → Script properties.');
+  var writes = [], log = [p.key];
+  function put(coll, cols, rows) {
+    writes.push(upsert_(coll + '/' + p.key, {
+      month: p.key, cols: JSON.stringify(cols), rows: JSON.stringify(rows), rowCount: rows.length,
+      source: 'reports-api', syncedAt: new Date().toISOString(),
+    }));
+    log.push(coll + ' ' + rows.length);
+  }
+
+  // Package profitability → the Sales page's own format (Bglobal → BGlobal, Renewal* → Monthly).
+  var pk = data_('packages-profitability', { year: p.y, month: p.m });
+  put('mkt_sales', ['market', 'type', 'package', 'subscribers', 'minutes', 'charged', 'cost', 'didCost'], pk.map(function (r) {
+    var mk = String(r.market || '').trim(); if (mk.toLowerCase() === 'bglobal') mk = 'BGlobal';
+    var ty = String(r.type || '').trim(); if (ty.indexOf('Renewal') === 0) ty = 'Monthly';
+    return [mk, ty, String(r.packageName || '').trim(), Math.round(+r.subscribers || 0), Math.round(+r.minutes || 0),
+            round2_(r.charged), round2_(r.cost), round2_(r.dIDCost)];
+  }));
+
+  var en = data_('vnumber-enrollments', { year: p.y, month: p.m });
+  put('mkt_vnEnroll',
+    ['day', 'didCountry', 'originCountry', 'package', 'creator', 'status', 'language', 'promo',
+     'count', 'amount', 'credit', 'closed', 'inMin', 'outMin', 'inSms', 'outSms'],
+    cube_(en, function (r) {
+      return [day_(r.creationDate), r.dIDCountry, r.originCountry, r.package, r.creator, r.status, r.language, r.promo_code || ''];
+    }, function (r) {
+      return [1, +r.amount || 0, +r.credit || 0, r.closerDate ? 1 : 0, +r.incomingMinutes || 0, +r.outgoingMinutes || 0,
+              +r.incomingSms || 0, +r.outgoingSms || 0];
+    }));
+
+  var su = data_('subscribers', { fromDate: p.from, toDate: p.to });
+  put('mkt_subs', ['day', 'plan', 'agent', 'creator', 'status', 'autoTopup', 'count', 'credit'],
+    cube_(su, function (r) {
+      return [day_(r.creationDate), r.packageName, r.agent, r.creatorAdminUser, r.status, r.autoTopup];
+    }, function (r) { return [1, +r.credit || 0]; }));
+
+  var mr = data_('mr-daily-revenue', { fromDate: p.from, toDate: p.to });
+  put('mkt_mr', ['day', 'market', 'rep', 'amount', 'transactions'],
+    cube_(mr, function (r) { return [day_(r.day), r.market, r.rep]; },
+             function (r) { return [+r.amount || 0, +r.numberOfTransactions || 0]; }));
+
+  var si = data_('sim-activations', { fromDate: p.from, toDate: p.to });
+  put('mkt_sims', ['day', 'plan', 'creator', 'shipping', 'coupon', 'sims', 'amount', 'couponAmount', 'shippingAmount', 'days'],
+    cube_(si, function (r) { return [day_(r.orderDate), r.planName, r.creator, r.shippingType, r.coupon || '']; },
+             function (r) { return [+r.simCount || 0, +r.totalAmount || 0, +r.couponAmount || 0, +r.shippingAmount || 0, +r.totalDays || 0]; }));
+
+  commit_(writes);
+  Logger.log(log.join(' · '));
+}
+
+// Groups rows by the dimension tuple and sums the measures; returns [...dims, ...measures] rows.
+function cube_(rows, dims, measures) {
+  var map = {}, order = [];
+  rows.forEach(function (r) {
+    var d = dims(r).map(function (v) { return v === null || v === undefined ? '' : String(v).trim(); });
+    var k = JSON.stringify(d), m = measures(r);
+    if (!map[k]) { map[k] = d.concat(m.map(function () { return 0; })); order.push(k); }
+    var row = map[k];
+    m.forEach(function (v, i) { row[d.length + i] += v; });
+  });
+  return order.map(function (k) {
+    return map[k].map(function (v) { return typeof v === 'number' ? round2_(v) : v; });
+  });
+}
+
+function data_(endpoint, params) {
+  var body = fetch_(endpoint, params);
+  if (!body || body.isSuccessful === false || body.isError) {
+    throw new Error(endpoint + ' ' + JSON.stringify(params) + ': ' + (body && (body.errorMessage || JSON.stringify(body.messages))));
+  }
+  return (body.result && body.result.data) || [];
+}
+
+function day_(s) { return s ? String(s).slice(0, 10) : ''; }
+function round2_(v) { return Math.round((+v || 0) * 100) / 100; }
+
+// ───────────────────────── Firestore (same as AdsSync.gs) ─────────────────────────
+function upsert_(path, obj) { return { update: { name: REPORTS.FIRESTORE + '/' + path, fields: toFields_(obj) } }; }
+function commit_(writes) {
+  var url = 'https://firestore.googleapis.com/v1/' + REPORTS.FIRESTORE + ':commit';
+  for (var i = 0; i < writes.length; i += 400) {
+    var resp = UrlFetchApp.fetch(url, {
+      method: 'post', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+      payload: JSON.stringify({ writes: writes.slice(i, i + 400) }), muteHttpExceptions: true,
+    });
+    if (resp.getResponseCode() !== 200) throw new Error('Firestore ' + resp.getResponseCode() + ': ' + resp.getContentText().slice(0, 1500));
+  }
+}
+function toValue_(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toValue_) } };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'object') return { mapValue: { fields: toFields_(v) } };
+  return { stringValue: String(v) };
+}
+function toFields_(obj) { var f = {}; Object.keys(obj).forEach(function (k) { f[k] = toValue_(obj[k]); }); return f; }
+
+// ───────────────────────── Probe (shape only) ─────────────────────────
 
 // Fields whose values are never logged (personal or account data)…
 var PRIVATE_RE = /name|phone|mobile|email|mail|address|msisdn|number|did|iccid|imsi|imei|card|account|customer|subscriber|user|login|ip|zip|city|street|dob|birth|ssn|passport/i;
