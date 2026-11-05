@@ -137,6 +137,10 @@ td input[type=checkbox]{accent-color:var(--orange);width:15px;height:15px;cursor
 .split{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
 
 /* Reviews */
+.subnav{display:inline-flex;gap:3px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px;margin-bottom:1rem;flex-wrap:wrap;}
+.subnav a{padding:6px 12px;border-radius:5px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;display:inline-flex;gap:6px;align-items:center;}
+.subnav a:hover{color:var(--dark);}
+.subnav a.active{background:var(--orange-light);color:var(--orange);}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:1rem;flex-wrap:wrap;}
 .tab{padding:9px 12px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;gap:6px;align-items:center;}
 .tab:hover{color:var(--dark);}
@@ -267,9 +271,7 @@ h1 .bchip{font-size:12px;vertical-align:4px;}
       </a>
       <span class="app-name">Marketing</span>
       <a class="nav-btn" id="nav-performance" href="#/performance">Markets</a>
-      <a class="nav-btn" id="nav-campaigns" href="#/campaigns">Campaigns</a>
-      <a class="nav-btn" id="nav-pages" href="#/pages">Landing pages</a>
-      <a class="nav-btn" id="nav-reviews" href="#/reviews">Reviews <span class="count" id="nav-count" style="display:none"></span></a>
+      <a class="nav-btn" id="nav-campaigns" href="#/campaigns">Campaigns <span class="count" id="nav-count" style="display:none" title="Proposals waiting for review"></span></a>
       <a class="nav-btn" id="nav-sales" href="sales.html">Sales</a>
       <a class="nav-btn" id="nav-vnumber" href="vnumber.html">VNUMBER</a>
       <a class="nav-btn" href="enrollments.html">Enrollments</a>
@@ -1141,14 +1143,16 @@ function render(){
 
   const [, section = 'performance', a, b] = (location.hash || '#/performance').split('/');
   document.getElementById('nav-performance').classList.toggle('active', section === 'performance' || section === 'market');
-  document.getElementById('nav-campaigns').classList.toggle('active', section === 'campaigns');
-  document.getElementById('nav-pages').classList.toggle('active', section === 'pages');
-  document.getElementById('nav-reviews').classList.toggle('active', section === 'reviews');
+  // Landing pages and Reviews live under Campaigns, as sub-tabs.
+  const inCamp = ['campaigns', 'pages', 'reviews'].includes(section);
+  document.getElementById('nav-campaigns').classList.toggle('active', inCamp);
+  const sub = inCamp ? `<nav class="subnav" aria-label="Campaigns sections">${[['campaigns', 'Campaigns'], ['pages', 'Landing pages'], ['reviews', 'Reviews']]
+    .map(([k, l]) => `<a href="#/${k}" class="${section === k ? 'active' : ''}"${section === k ? ' aria-current="page"' : ''}>${l}${k === 'reviews' && n ? ` <span class="count">${n}</span>` : ''}</a>`).join('')}</nav>` : '';
   const y = window.scrollY, same = render.last === location.hash;
   if (section === 'market') { view.innerHTML = viewMarket(a); drawCharts(); }
-  else if (section === 'campaigns') { view.innerHTML = viewCampaigns(); drawCharts(); }
-  else if (section === 'pages') view.innerHTML = viewPages();
-  else if (section === 'reviews') view.innerHTML = viewReviews(a || 'pending', b);
+  else if (section === 'campaigns') { view.innerHTML = sub + viewCampaigns(); drawCharts(); }
+  else if (section === 'pages') view.innerHTML = sub + viewPages();
+  else if (section === 'reviews') view.innerHTML = sub + viewReviews(a || 'pending', b);
   else view.innerHTML = viewPerformance();
   window.scrollTo(0, same ? y : 0);
   render.last = location.hash;

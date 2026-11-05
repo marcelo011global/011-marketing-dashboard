@@ -5,7 +5,7 @@
   --brand:#EE7805; --brand-ink:#C46204; --brand-soft:#FDF0E3;
   --slate:#3A6EA5;
   --good:#1E7F4F; --good-soft:#E3F3EA; --bad:#B42318; --bad-soft:#FBE7E4; --warn:#9A6200; --warn-soft:#FCF0D6; --sleep:#5A5F86; --sleep-soft:#E9EAF4;
-  --c-israel:#3A6EA5; --c-brazil:#EE7805; --c-hispanic:#2A9D8F; --c-bglobal:#9B5DE5; --c-asia:#C2185B;
+  --c-israel:#3A6EA5; --c-brazil:#EE7805; --c-hispanic:#2A9D8F; --c-bglobal:#9B5DE5; --c-asia:#C2185B; --c-globusim:#6B8E23;
   --display:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif; --body:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif; --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}

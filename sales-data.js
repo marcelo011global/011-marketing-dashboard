@@ -114,19 +114,22 @@ export function parseWorkbook(buf){
 
 // ── Firestore ──
 export async function loadAll(){
-  const [snap, metaSnap, sumSnap, ltvSnap] = await Promise.all([
+  const [snap, metaSnap, sumSnap, ltvSnap, simSnap, mrSnap] = await Promise.all([
     getDocs(collection(db, 'mkt_sales')),
     getDoc(doc(db, 'mkt_salesMeta', 'last')).catch(() => null),
     getDoc(doc(db, 'mkt_vnumber', 'summary')).catch(() => null),
     getDoc(doc(db, 'mkt_vnumber', 'ltv')).catch(() => null),
+    getDocs(collection(db, 'mkt_sims')).catch(() => null),   // Reports API sync (sync/ReportsSync.gs)
+    getDocs(collection(db, 'mkt_mr')).catch(() => null),
   ]);
+  const months = qs => { const o = {}; qs?.forEach(d => { const x = d.data(), cols = JSON.parse(x.cols || '[]'); o[x.month || d.id] = JSON.parse(x.rows || '[]').map(r => Object.fromEntries(cols.map((c, i) => [c, r[i]]))); }); return o; };
   const sales = {};
   snap.forEach(d => { if (/^\d{4}-\d{2}$/.test(d.id)) sales[d.id] = JSON.parse(d.data().rows); });
   const m = metaSnap?.exists() ? metaSnap.data() : null;
   const s = sumSnap?.exists() ? sumSnap.data() : null;
   const l = ltvSnap?.exists() ? ltvSnap.data() : null;
   return {
-    sales, meta: m ? { by: m.by, at: m.at?.toDate?.() } : null,
+    sales, sims: months(simSnap), mr: months(mrSnap), meta: m ? { by: m.by, at: m.at?.toDate?.() } : null,
     summary: s ? JSON.parse(s.months) : null,
     ltv: l ? { months: JSON.parse(l.months), rows: JSON.parse(l.rows), total: l.total ? JSON.parse(l.total) : null } : null,
   };
@@ -189,7 +192,13 @@ export function initPage(opts){
   if (LOCAL_PREVIEW) {
     $('user-display').textContent = 'Local preview';
     fetch('test-report.xlsx').then(r => r.ok ? r.arrayBuffer() : null)
-      .then(b => { const p = b ? parseWorkbook(b) : {}; current = { sales: p.sales || {}, summary: p.summary || null, ltv: p.ltv || null, meta: null }; show(current); })
+      .then(async b => {
+        const p = b ? parseWorkbook(b) : {};
+        // Synthetic Reports API data (gitignored preview-data/), if present.
+        const pj = f => fetch('preview-data/' + f + '.json').then(r => r.ok ? r.json() : null).catch(() => null);
+        const [ps, sims, mr] = await Promise.all([pj('mkt_sales'), pj('mkt_sims'), pj('mkt_mr')]);
+        current = { sales: p.sales || ps?.months || {}, sims: sims?.months || {}, mr: mr?.months || {}, summary: p.summary || null, ltv: p.ltv || null, meta: null }; show(current);
+      })
       .catch(e => { console.error(e); current = { sales: {}, summary: null, ltv: null, meta: null }; show(current); });
     return;
   }
@@ -203,6 +212,23 @@ export function initPage(opts){
       gate(`<h1>${opts.title} could not load</h1><p>${/permission|insufficient/i.test(e.message || '') ? 'Firestore refused access. The security rules need to allow signed-in staff to read the mkt_sales and mkt_vnumber collections.' : 'Something went wrong while loading. Reload the page to try again.'}</p>`);
     }
   });
+}
+
+// Adds SIM activations and mobile recharge to the package rows, as their own types, revenue only
+// (the Reports API has no cost for them): SIMs under market "Globusim" with the plan as the package,
+// recharge under its market as one "Mobile recharge" line. Only months that have package data.
+export const PRODUCT_TYPES = { sim: 'SIM activation', mr: 'Mobile recharge' };
+export function withProducts(d){
+  const out = {};
+  for (const k of Object.keys(d.sales || {})) {
+    const rows = d.sales[k].slice(), add = {};
+    const put = (mk, ty, pkg, amt) => { const id = mk + '|' + ty + '|' + pkg; add[id] = (add[id] || 0) + (+amt || 0); };
+    (d.sims?.[k] || []).forEach(r => put('Globusim', PRODUCT_TYPES.sim, r.plan || '(no plan)', r.amount));
+    (d.mr?.[k] || []).forEach(r => { let mk = String(r.market || '').trim(); if (mk.toLowerCase() === 'bglobal') mk = 'BGlobal'; put(mk || '(none)', PRODUCT_TYPES.mr, 'Mobile recharge', r.amount); });
+    for (const [id, amt] of Object.entries(add)) { const [mk, ty, pkg] = id.split('|'); rows.push([mk, ty, pkg, 0, 0, Math.round(amt * 100) / 100, 0]); }
+    out[k] = rows;
+  }
+  return out;
 }
 
 // Package rows per month → the compact {d, m, t, p, r} format the Sales page draws from.

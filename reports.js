@@ -84,9 +84,10 @@ export function initReport(cfg){
 function start(cfg, data){
   const keys = Object.keys(data.months).sort();
   const lead = cfg.measures[0];
-  const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], f: {}, open: {} };
+  const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], f: {}, open: {}, view: cfg.view || 'monthly' };
   const today = new Date().toISOString().slice(0, 7);
   if (st.to === today && keys.length > 1) st.from = st.to = keys[keys.length - 2];   // default: last full month
+  if (cfg.months > 1) st.from = keys[Math.max(0, keys.indexOf(st.to) - cfg.months + 1)];   // or the last N full months
 
   $('srcnote').textContent = data.synced ? 'Synced ' + new Date(data.synced).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' from the Reports API' : '';
 
@@ -97,6 +98,7 @@ function start(cfg, data){
   $('filters').innerHTML =
     `<div class="f"><label for="from">From</label><select id="from">${keys.map(k => opt(k, monthName(k), k === st.from)).join('')}</select></div>
      <div class="f"><label for="to">To</label><select id="to">${keys.map(k => opt(k, monthName(k) + (k === today ? ' (so far)' : ''), k === st.to)).join('')}</select></div>` +
+    `<div class="f"><span class="lbl">View</span><div class="seg" id="view" role="group" aria-label="Chart view">${['monthly','daily'].map(v => `<button type="button" data-v="${v}" aria-pressed="${st.view === v}">${v === 'monthly' ? 'Monthly' : 'Daily'}</button>`).join('')}</div></div>` +
     fdims.map(d => {
       const tot = {}; all.forEach(r => tot[r[d.key]] = (tot[r[d.key]] || 0) + (+r[lead.key] || 0));
       const vals = Object.keys(tot).filter(v => v !== '').sort((a, b) => tot[b] - tot[a]);
@@ -104,6 +106,9 @@ function start(cfg, data){
     }).join('');
   $('from').onchange = e => { st.from = e.target.value; if (st.from > st.to) { st.to = st.from; $('to').value = st.to; } render(); };
   $('to').onchange = e => { st.to = e.target.value; if (st.to < st.from) { st.from = st.to; $('from').value = st.from; } render(); };
+  $('view').querySelectorAll('button').forEach(b => b.onclick = () => {
+    st.view = b.dataset.v; $('view').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); render();
+  });
   fdims.forEach(d => $('f-' + d.key).onchange = e => { st.f[d.key] = e.target.value; render(); });
 
   let chart;
@@ -127,14 +132,15 @@ function start(cfg, data){
       return `<div class="kpi${i === 0 ? ' lead' : ''}"><span class="lbl">${esc(m.label)}</span><span class="v">${FMT[m.fmt](c)}</span>${prevKeys.length ? delta(c, p) : ''}</div>`;
     }).join('') + extra.map(k => `<div class="kpi"><span class="lbl">${esc(k.label)}</span><span class="v">${esc(k.value)}</span>${k.note ? `<span class="delta">${esc(k.note)}</span>` : ''}</div>`).join('');
 
-    // Trend: daily bars for one month, monthly bars otherwise (all months shown, the selection highlighted).
+    // Trend: Daily = one bar per day of the selected months; Monthly = every month, the selection highlighted.
     let labels, vals, colors;
-    if (n === 1) {
+    if (st.view === 'daily') {
       const by = {}; cur.forEach(r => by[r.day] = (by[r.day] || 0) + (+r[lead.key] || 0));
-      const [y, m] = st.from.split('-').map(Number), days = new Date(y, m, 0).getDate();
-      labels = Array.from({ length: days }, (_, i) => String(i + 1));
-      vals = labels.map(d => by[st.from + '-' + d.padStart(2, '0')] || 0);
-      colors = labels.map(() => '#EE7805');
+      const lastDay = new Date().toISOString().slice(0, 10), dates = [];
+      inRange.forEach(k => { const [y, m] = k.split('-').map(Number); for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) { const ds = k + '-' + String(d).padStart(2, '0'); if (ds < lastDay) dates.push(ds); } });
+      labels = dates.map(ds => n === 1 ? String(+ds.slice(8)) : MN[+ds.slice(5, 7) - 1] + ' ' + +ds.slice(8));
+      vals = dates.map(ds => by[ds] || 0);
+      colors = dates.map(() => '#EE7805');
       $('trendTitle').textContent = lead.label + ' per day';
     } else {
       labels = keys.map(monthName);
@@ -151,9 +157,14 @@ function start(cfg, data){
         scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: v => FMT[lead.fmt](v) } } } },
     });
 
-    // One ranked table per breakdown.
+    // Month-by-month table (Monthly view), then one ranked table per breakdown.
     const total = sum(cur, lead.key);
-    $('tables').innerHTML = cfg.dims.map(d => {
+    const monthTable = st.view !== 'monthly' || n < 2 ? '' : `<section class="panel"><div class="ph"><h2>By month</h2><p class="note">${n} months</p></div>
+      <div class="tbl"><table><thead><tr><th>Month</th>${cfg.measures.map(m => `<th>${esc(m.label)}</th>`).join('')}<th>vs month before</th></tr></thead>
+      <tbody>${inRange.slice().reverse().map(k => { const rows = data.months[k].filter(pass), pk = keys[keys.indexOf(k) - 1], pr = pk ? data.months[pk].filter(pass) : null;
+        return `<tr><td class="name">${esc(monthName(k))}${k === today ? ' (so far)' : ''}</td>${cfg.measures.map(m => `<td>${FMT[m.fmt](sum(rows, m.key))}</td>`).join('')}<td>${pr ? delta(sum(rows, lead.key), sum(pr, lead.key)) : '—'}</td></tr>`; }).join('')}</tbody>
+      <tfoot><tr><td class="name"><b>Total</b></td>${cfg.measures.map(m => `<td><b>${FMT[m.fmt](sum(cur, m.key))}</b></td>`).join('')}<td></td></tr></tfoot></table></div></section>`;
+    $('tables').innerHTML = monthTable + cfg.dims.map(d => {
       const g = {}, gp = {};
       cur.forEach(r => { const k = r[d.key] === '' ? '(none)' : r[d.key]; const a = g[k] || (g[k] = {}); cfg.measures.forEach(m => a[m.key] = (a[m.key] || 0) + (+r[m.key] || 0)); });
       prev.forEach(r => { const k = r[d.key] === '' ? '(none)' : r[d.key]; gp[k] = (gp[k] || 0) + (+r[lead.key] || 0); });

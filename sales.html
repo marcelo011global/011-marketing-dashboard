@@ -15,8 +15,6 @@
     <span class="app-name">Marketing</span>
     <a class="nav-btn" href="index.html#/performance">Markets</a>
     <a class="nav-btn" href="index.html#/campaigns">Campaigns</a>
-    <a class="nav-btn" href="index.html#/pages">Landing pages</a>
-    <a class="nav-btn" href="index.html#/reviews">Reviews</a>
     <a class="nav-btn active" href="sales.html">Sales</a>
     <a class="nav-btn" href="vnumber.html">VNUMBER</a>
     <a class="nav-btn" href="enrollments.html">Enrollments</a>
@@ -51,6 +49,7 @@
     <div class="f"><label for="month">Month</label><select id="month"></select></div>
     <div class="f"><label for="cmp">Compare to</label><select id="cmp"></select></div>
     <div class="f"><span class="lbl">Packages</span><div class="seg" id="vn" role="group" aria-label="Package group"><button data-v="" aria-pressed="true">Total</button><button data-v="vn" aria-pressed="false">Vnumber</button><button data-v="non" aria-pressed="false">Non-Vnumber</button></div></div>
+    <div class="f"><span class="lbl">Product</span><div class="seg" id="prod" role="group" aria-label="Product"><button data-v="" aria-pressed="true">All</button><button data-v="pkg" aria-pressed="false">Calling packages</button><button data-v="sim" aria-pressed="false">SIM activations</button><button data-v="mr" aria-pressed="false">Mobile recharge</button></div></div>
     <div class="f"><label for="type">Type</label><select id="type"></select></div>
     <div class="f"><span class="lbl">Market</span><div class="chips" id="markets"></div></div>
   </div>
@@ -114,7 +113,7 @@
     <button class="more" id="more" hidden></button>
   </section>
 
-  <footer>Source: the monthly Package Profitability report (PackagesProfitability_Active_Sl tab), uploaded with the button above. Gross profit = Charged − Cost. Margin = gross profit ÷ charged. ARPU = charged ÷ subscribers. Vnumber = packages named Vnumber_…, the same set as the workbook’s Vnumber pivot. Click a package row to see its history.</footer>
+  <footer>Source: the monthly Package Profitability report (PackagesProfitability_Active_Sl tab), uploaded with the button above. SIM activations and mobile recharge come from the Reports API (synced nightly) and count as revenue only, because their cost isn't in the API yet, so with them included gross profit and margin read higher than for calling packages alone; ARPU always uses calling-package revenue only. Gross profit = Charged − Cost. Margin = gross profit ÷ charged. ARPU = charged ÷ subscribers. Vnumber = packages named Vnumber_…, the same set as the workbook’s Vnumber pivot. Click a package row to see its history.</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -123,8 +122,8 @@
 <script>
 window.startDashboard=function(DATA){
 const D=DATA.d,M=DATA.m,T=DATA.t,P=DATA.p,R=DATA.r;
-const MKEY={Israel:'israel',Brazil:'brazil',Hispanic:'hispanic',BGlobal:'bglobal',Asia:'asia'};
-const MORDER=['Israel','Brazil','Hispanic','BGlobal','Asia'].filter(m=>M.includes(m));
+const MKEY={Israel:'israel',Brazil:'brazil',Hispanic:'hispanic',BGlobal:'bglobal',Asia:'asia',Globusim:'globusim'};
+const MORDER=['Israel','Brazil','Hispanic','BGlobal','Asia','Globusim'].filter(m=>M.includes(m));
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const mcol=m=>css('--c-'+MKEY[m]);
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -137,14 +136,17 @@ const fn=v=>Math.round(v).toLocaleString('en-US');
 const fp=v=>isFinite(v)?(v*100).toFixed(1)+'%':'–';
 const f2=v=>'$'+v.toFixed(2);
 
-const st={month:D.length-1,cmp:D.length-2,type:'',mk:new Set(MORDER),range:24,metric:'rev',q:'',flag:'',sort:'rev',dir:-1,limit:25,pkg:null,vn:'',sview:'market'};
+const st={month:D.length-1,cmp:D.length-2,type:'',mk:new Set(MORDER),range:24,metric:'rev',q:'',flag:'',sort:'rev',dir:-1,limit:25,pkg:null,vn:'',sview:'market',prod:''};
 try{const s=JSON.parse(localStorage.getItem('pp-ui')||'{}');if(s.range)st.range=s.range;if(s.metric)st.metric=s.metric}catch(e){}
 const save=()=>{try{localStorage.setItem('pp-ui',JSON.stringify({range:st.range,metric:st.metric}))}catch(e){}};
 
 const VN=P.map(p=>p.startsWith('Vnumber_'));
-const passX=r=>(st.type===''||T[r[2]]===st.type)&&(st.vn===''||(st.vn==='vn')===VN[r[3]]);
+// SIM activations and mobile recharge come from the Reports API as their own types, revenue only.
+const PTYPE={sim:'SIM activation',mr:'Mobile recharge'},XT=T.map(t=>t===PTYPE.sim||t===PTYPE.mr);
+const passProd=r=>st.prod===''||(st.prod==='pkg'?!XT[r[2]]:T[r[2]]===PTYPE[st.prod]);
+const passX=r=>passProd(r)&&(st.type===''||T[r[2]]===st.type)&&(st.vn===''||(st.vn==='vn')===VN[r[3]]);
 const pass=r=>st.mk.has(M[r[1]])&&passX(r);
-function agg(filter){const o={subs:0,min:0,rev:0,cost:0};for(const r of R)if(filter(r)){o.subs+=r[4];o.min+=r[5];o.rev+=r[6];o.cost+=r[7]}o.gp=o.rev-o.cost;return o}
+function agg(filter){const o={subs:0,min:0,rev:0,cost:0,prev:0,xrev:0};for(const r of R)if(filter(r)){o.subs+=r[4];o.min+=r[5];o.rev+=r[6];o.cost+=r[7];if(XT[r[2]])o.xrev+=r[6];else o.prev+=r[6]}o.gp=o.rev-o.cost;return o}
 function byPkg(mi){const m=new Map();for(const r of R){if(r[0]!==mi||!pass(r))continue;let o=m.get(r[3]);if(!o){o={p:r[3],mk:new Set(),ty:new Set(),subs:0,min:0,rev:0,cost:0};m.set(r[3],o)}o.mk.add(r[1]);o.ty.add(r[2]);o.subs+=r[4];o.min+=r[5];o.rev+=r[6];o.cost+=r[7]}for(const o of m.values())o.gp=o.rev-o.cost;return m}
 
 // filters
@@ -152,7 +154,7 @@ const msel=$('#month'),csel=$('#cmp'),tsel=$('#type');
 for(let i=D.length-1;i>=0;i--){msel.add(new Option(ml(i),i));csel.add(new Option(ml(i),i))}
 csel.add(new Option('Same month last year','yoy'),0);
 msel.value=st.month;csel.value=st.cmp;
-tsel.add(new Option('All types',''));T.forEach(t=>{const o=new Option(t,t);o.dataset.l=t;tsel.add(o)});
+tsel.add(new Option('All types',''));T.filter((t,i)=>!XT[i]).forEach(t=>{const o=new Option(t,t);o.dataset.l=t;tsel.add(o)});
 const mbox=$('#markets');
 MORDER.forEach(m=>{const b=document.createElement('button');b.className='chip';b.type='button';b.setAttribute('aria-pressed','true');b.dataset.m=m;b.innerHTML=`<span class="dot" style="background:var(--c-${MKEY[m]})"></span>${m}`;b.onclick=()=>{if(st.mk.has(m)){if(st.mk.size===1)return;st.mk.delete(m)}else st.mk.add(m);b.setAttribute('aria-pressed',st.mk.has(m));render()};mbox.appendChild(b)});
 msel.onchange=()=>{st.month=+msel.value;if(csel.value!=='yoy'){st.cmp=Math.max(0,st.month-1);csel.value=st.cmp}else st.cmp=st.month-12;render()};
@@ -160,6 +162,7 @@ csel.onchange=()=>{st.cmp=csel.value==='yoy'?st.month-12:+csel.value;render()};
 tsel.onchange=()=>{st.type=tsel.value;render()};
 document.querySelectorAll('#range button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.r===st.range);b.onclick=()=>{st.range=+b.dataset.r;document.querySelectorAll('#range button').forEach(x=>x.setAttribute('aria-pressed',x===b));save();renderCharts();renderSubs()}});
 document.querySelectorAll('#mmetric button').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.k===st.metric);b.onclick=()=>{st.metric=b.dataset.k;document.querySelectorAll('#mmetric button').forEach(x=>x.setAttribute('aria-pressed',x===b));save();renderCharts()}});
+document.querySelectorAll('#prod button').forEach(b=>{b.onclick=()=>{st.prod=b.dataset.v;document.querySelectorAll('#prod button').forEach(x=>x.setAttribute('aria-pressed',x===b));st.limit=25;render()}});
 document.querySelectorAll('#vn button').forEach(b=>{b.onclick=()=>{st.vn=b.dataset.v;document.querySelectorAll('#vn button').forEach(x=>x.setAttribute('aria-pressed',x===b));st.limit=25;render()}});
 document.querySelectorAll('#sview button').forEach(b=>{b.onclick=()=>{st.sview=b.dataset.s;document.querySelectorAll('#sview button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderSubs()}});
 $('#q').oninput=e=>{st.q=e.target.value.toLowerCase();st.limit=25;renderPkgs()};
@@ -180,14 +183,15 @@ function renderKpis(){
   const k=[
     ['Revenue (charged)',fm(a.rev),delta(a.rev,b&&b.rev),'lead'],
     ['Gross profit',fm(a.gp),delta(a.gp,b&&b.gp)],
+    ...(st.prod==='sim'||st.prod==='mr'?[['Margin','–','<span>no cost data yet</span>'],['Cost','–','<span>not in the Reports API</span>']]:[
     ['Margin',a.rev?fp(a.gp/a.rev):'–',delta(a.gp/a.rev,b&&b.gp/b.rev,'pt')],
-    ['Cost',fm(a.cost),delta(a.cost,b&&b.cost,'inv')],
+    ['Cost',fm(a.cost),delta(a.cost,b&&b.cost,'inv')]]),
     ['Subscribers',fn(a.subs),delta(a.subs,b&&b.subs)],
-    ['ARPU',f2(a.rev/a.subs||0),delta(a.rev/a.subs,b&&b.rev/b.subs)],
+    ['ARPU',f2(a.prev/a.subs||0),delta(a.prev/a.subs,b&&b.prev/b.subs)],
     ['Minutes',fn(a.min),delta(a.min,b&&b.min)],
   ];
   $('#kpis').innerHTML=k.map(([l,v,d,c])=>`<div class="kpi ${c||''}"><span class="lbl">${l}</span><span class="v">${v}</span><span class="delta">${d}</span></div>`).join('');
-  $('#sub').textContent=`${ml(st.month)} · ${st.mk.size===MORDER.length?'all markets':[...st.mk].join(', ')} · ${st.vn==='vn'?'Vnumber packages':st.vn==='non'?'non-Vnumber packages':'all packages'} · ${st.type?tsel.selectedOptions[0].text:'all package types'} · data ${ml(0)} to ${ml(D.length-1)}`;
+  $('#sub').textContent=`${ml(st.month)} · ${st.mk.size===MORDER.length?'all markets':[...st.mk].join(', ')} · ${st.prod==='sim'?'SIM activations':st.prod==='mr'?'mobile recharge':(st.prod===''?'all products · ':'')+(st.vn==='vn'?'Vnumber packages':st.vn==='non'?'non-Vnumber packages':'all packages')} · ${st.type?tsel.selectedOptions[0].text:'all package types'} · data ${ml(0)} to ${ml(D.length-1)}`;
 }
 
 Chart.defaults.font.family=css('--body');Chart.defaults.font.size=12;Chart.defaults.animation=matchMedia('(prefers-reduced-motion: reduce)').matches?false:{duration:300};
@@ -287,8 +291,8 @@ function renderMarkets(){
   const ch=(a,b)=>!b?'<span>–</span>':`<span class="${a>=b?'up':'down'}">${a>=b?'+':''}${((a-b)/Math.abs(b)*100).toFixed(1)}%</span>`;
   $('#mnote').textContent=ml(st.month)+(st.cmp>=0?' · change vs '+ml(st.cmp):'');
   $('#mtable').innerHTML=`<thead><tr><th>Market</th><th>Revenue</th><th>Share</th><th>Gross profit</th><th>Margin</th><th>Subs</th><th>ARPU</th><th>Rev. change</th></tr></thead><tbody>`+
-   rows.map(({m,a,b})=>`<tr><td class="name"><span class="mk" style="background:${mcol(m)}"></span>${m}</td><td>${fm(a.rev)}</td><td>${fp(a.rev/tot.rev)}</td><td>${fm(a.gp)}</td><td>${fp(a.gp/a.rev)}</td><td>${fn(a.subs)}</td><td>${a.subs?f2(a.rev/a.subs):'–'}</td><td>${ch(a.rev,b&&b.rev)}</td></tr>`).join('')+
-   `</tbody><tfoot><tr><td>Total</td><td>${fm(tot.rev)}</td><td>100%</td><td>${fm(tot.gp)}</td><td>${fp(tot.gp/tot.rev)}</td><td>${fn(tot.subs)}</td><td>${f2(tot.rev/tot.subs||0)}</td><td></td></tr></tfoot>`;
+   rows.map(({m,a,b})=>`<tr><td class="name"><span class="mk" style="background:${mcol(m)}"></span>${m}</td><td>${fm(a.rev)}</td><td>${fp(a.rev/tot.rev)}</td><td>${fm(a.gp)}</td><td>${fp(a.gp/a.rev)}</td><td>${fn(a.subs)}</td><td>${a.subs?f2(a.prev/a.subs):'–'}</td><td>${ch(a.rev,b&&b.rev)}</td></tr>`).join('')+
+   `</tbody><tfoot><tr><td>Total</td><td>${fm(tot.rev)}</td><td>100%</td><td>${fm(tot.gp)}</td><td>${fp(tot.gp/tot.rev)}</td><td>${fn(tot.subs)}</td><td>${f2(tot.prev/tot.subs||0)}</td><td></td></tr></tfoot>`;
 }
 
 let cur,prev;
@@ -345,8 +349,8 @@ function openPkg(p,scroll=true){
 }
 
 
-function selText(){const p=[];if(st.vn)p.push(st.vn==='vn'?'Vnumber':'Non-Vnumber');if(st.type)p.push(st.type);p.push(st.mk.size===MORDER.length?'any market':[...st.mk].join(', '));return p.join(' · ')}
-function resetFilters(){st.vn='';st.type='';st.mk=new Set(MORDER);tsel.value='';document.querySelectorAll('#vn button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===''));document.querySelectorAll('#markets .chip').forEach(b=>b.setAttribute('aria-pressed','true'));render()}
+function selText(){const p=[];if(st.prod)p.push(st.prod==='pkg'?'Calling packages':st.prod==='sim'?'SIM activations':'Mobile recharge');if(st.vn)p.push(st.vn==='vn'?'Vnumber':'Non-Vnumber');if(st.type)p.push(st.type);p.push(st.mk.size===MORDER.length?'any market':[...st.mk].join(', '));return p.join(' · ')}
+function resetFilters(){st.prod='';document.querySelectorAll('#prod button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===''));st.vn='';st.type='';st.mk=new Set(MORDER);tsel.value='';document.querySelectorAll('#vn button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===''));document.querySelectorAll('#markets .chip').forEach(b=>b.setAttribute('aria-pressed','true'));render()}
 function setNoData(canvas,on,msg){const o=document.getElementById(canvas).parentElement.querySelector('.nodata');o.hidden=!on;if(on)o.innerHTML=`<span>${msg}</span><button class="reset" type="button">Reset filters</button>`,o.querySelector('button').onclick=resetFilters}
 function syncOptions(){
   const any=f=>R.some(f);
@@ -372,12 +376,12 @@ render();
 <div id="toast" hidden></div>
 
 <script type="module">
-import { initPage, toDATA } from './sales-data.js';
+import { initPage, toDATA, withProducts } from './sales-data.js';
 initPage({
   title: 'Sales',
   emptyText: 'No sales report has been uploaded yet. Upload the monthly Package Profitability workbook (.xlsx) to fill this page. A file with the full history fills every month; a file with one month adds or replaces just that month.',
   ready: d => Object.keys(d.sales || {}).length > 0,
-  render: d => window.startDashboard(toDATA(d.sales)),
+  render: d => window.startDashboard(toDATA(withProducts(d))),
 });
 </script>
 </body>

@@ -144,3 +144,9 @@ phone numbers or customer IDs: `mkt_sales` (same format as the Sales xlsx upload
 Pages `enrollments.html`, `subscribers.html`, `recharge.html`, `sims.html` share `reports.js`
 (config: coll, dims, measures, kpis). Local preview: `?preview` on localhost reads gitignored
 `preview-data/<coll>.json` (synthetic only).
+Report pages have a Monthly/Daily view toggle (Monthly default, with a by-month table); SIMs and Recharge
+default to the last 12 full months (`months: 12`). The Sales page also loads `mkt_sims` and `mkt_mr` and
+adds them as types "SIM activation" (market Globusim, plan = package) and "Mobile recharge", revenue only
+(no cost in the API); a Product filter switches All / Calling packages / SIM activations / Mobile recharge,
+and ARPU always uses calling-package revenue. Landing pages and Reviews are sub-tabs of Campaigns
+(`.subnav` in index.html); their old #/pages and #/reviews routes still work.

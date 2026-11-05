@@ -16,8 +16,6 @@
     <span class="app-name">Marketing</span>
     <a class="nav-btn" href="index.html#/performance">Markets</a>
     <a class="nav-btn" href="index.html#/campaigns">Campaigns</a>
-    <a class="nav-btn" href="index.html#/pages">Landing pages</a>
-    <a class="nav-btn" href="index.html#/reviews">Reviews</a>
     <a class="nav-btn" href="sales.html">Sales</a>
     <a class="nav-btn" href="vnumber.html">VNUMBER</a>
     <a class="nav-btn" href="enrollments.html">Enrollments</a>
@@ -51,7 +49,7 @@
   <section class="kpis" id="kpis" aria-label="Key figures"></section>
 
   <section class="panel">
-    <div class="ph"><h2 id="trendTitle"></h2><p class="note">Pick one month for a daily view</p></div>
+    <div class="ph"><h2 id="trendTitle"></h2><p class="note">Switch between Monthly and Daily above</p></div>
     <div class="chart"><canvas id="trend"></canvas></div>
   </section>
 
@@ -65,7 +63,7 @@
 <script type="module">
 import { initReport } from './reports.js';
 initReport({
-  title: 'SIM activations', coll: 'mkt_sims',
+  title: 'SIM activations', coll: 'mkt_sims', months: 12,
   dims: [{ key: 'plan', label: 'Plan', filter: true }, { key: 'creator', label: 'Creator', filter: true }, { key: 'shipping', label: 'Shipping', filter: true }, { key: 'coupon', label: 'Coupon' }],
   measures: [{ key: 'sims', label: 'SIMs activated', fmt: 'int' }, { key: 'amount', label: 'Revenue', fmt: 'usd' }],
   kpis: (cur, prev, sum) => { const s = sum(cur, 'sims'); return [
