@@ -25,8 +25,11 @@ var REPORTS = {
   KEY: PropertiesService.getScriptProperties().getProperty('REPORTS_API_KEY'),
 };
 
-// Fields whose values are never logged (personal or account data).
-var PRIVATE_FIELD = /name|phone|mobile|email|mail|address|msisdn|number|did|iccid|imsi|imei|card|account|customer|subscriber|user|login|ip|zip|city|street|dob|birth|ssn|passport/i;
+// Fields whose values are never logged (personal or account data)…
+var PRIVATE_RE = /name|phone|mobile|email|mail|address|msisdn|number|did|iccid|imsi|imei|card|account|customer|subscriber|user|login|ip|zip|city|street|dob|birth|ssn|passport/i;
+// …except staff and plan fields, which the dashboards break down by (agent/creator, rep, plan/package).
+var BREAKDOWN_RE = /agent|creat|rep\b|^rep|seller|sales|plan|package|market|status|type|country/i;
+var PRIVATE_FIELD = { test: function (f) { return PRIVATE_RE.test(f) && !BREAKDOWN_RE.test(f); } };
 
 function probe() {
   if (!REPORTS.KEY) throw new Error('Set REPORTS_API_KEY in Project Settings → Script properties.');
@@ -79,7 +82,7 @@ function describe_(endpoint, body) {
     if (s.nums) line += ' sum ' + Math.round(s.sum * 100) / 100;
     var distinct = Object.keys(s.vals);
     if (PRIVATE_FIELD.test(f)) line += ' (private, values hidden)';
-    else if (distinct.length && distinct.length <= 25) line += ' values: ' + distinct.map(function (v) { return v + '×' + s.vals[v]; }).join('; ');
+    else if (distinct.length && distinct.length <= (BREAKDOWN_RE.test(f) ? 80 : 25)) line += ' values: ' + distinct.map(function (v) { return v + '×' + s.vals[v]; }).join('; ');
     else if (distinct.length) line += ' ' + distinct.length + ' distinct, e.g. ' + looksLike_(distinct[0]);
     out.push(line);
   });
