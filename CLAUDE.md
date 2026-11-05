@@ -134,3 +134,13 @@ writes (Approve verified on the live site).
 ## Company Info
 - **Company**: 011 Global · **Contact**: Marcelo Licht (marcelo@011global.com)
 - **Firebase project**: telecom-deals-f155b (shared with the 011 Telecom deals dashboard)
+
+## Reports API pages (since 2026-11-05)
+`sync/ReportsSync.gs` (own Apps Script project "Reports Sync" under ai@011global.com, key in Script property
+REPORTS_API_KEY, manifest `sync/appsscript.reports.json`) pulls the internal Reports API
+(hub.011global.com/api/externalreports) nightly at ~4am and writes AGGREGATED monthly docs — no names,
+phone numbers or customer IDs: `mkt_sales` (same format as the Sales xlsx upload, plus didCost),
+`mkt_vnEnroll`, `mkt_subs`, `mkt_mr`, `mkt_sims`; each doc {month, cols, rows, rowCount, source, syncedAt}.
+Pages `enrollments.html`, `subscribers.html`, `recharge.html`, `sims.html` share `reports.js`
+(config: coll, dims, measures, kpis). Local preview: `?preview` on localhost reads gitignored
+`preview-data/<coll>.json` (synthetic only).
