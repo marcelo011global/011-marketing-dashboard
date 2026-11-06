@@ -11,6 +11,9 @@
 .kgroup{display:grid;gap:8px}
 .kgroup>.lbl{padding-left:2px}
 .kpi .hint{font-size:11.5px;color:var(--fg3)}
+.kpi .pj{display:grid;gap:2px;margin-top:4px;padding-top:6px;border-top:1px dashed var(--line-strong)}
+.kpi .pjl{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--fg3)}
+.kpi .pj b{font:500 16px/1.2 var(--mono);color:var(--fg2)}
 .flat{color:var(--fg3)}
 td.l{text-align:left;font-family:var(--body)}
 .spark{display:block}
@@ -198,7 +201,30 @@ document.querySelectorAll('#range button').forEach(b=>{b.setAttribute('aria-pres
 
 // ── KPI tiles ──
 // dir: 1 = higher is better, -1 = lower is better, 0 = neutral; kind: 'pct' change or 'pts' change
-function tile(label,val,cur,prev,dir=1,kind='pct',hint=''){
+// Month in progress: straight-line projection to month end from the days covered so far
+// (sync time of the month's package data, Eastern). Flows (revenue, sales, enrollments, spend, churn) scale up;
+// ratios follow from the projected flows; active subscribers = last month's + projected new − projected churn.
+const PJ=(()=>{const k=keys.at(-1);if(!k)return null;const[y,m]=k.split('-').map(Number);
+  const et=d=>new Date(d.toLocaleString('en-US',{timeZone:'America/New_York'}));const now=et(new Date());
+  if(now.getFullYear()!==y||now.getMonth()+1!==m)return null;
+  let a=V.salesAt?.[k]?et(new Date(V.salesAt[k])):now;if(isNaN(a)||a.getFullYear()!==y||a.getMonth()+1!==m)a=now;
+  const dim=new Date(y,m,0).getDate(),el=Math.min(dim,(a-new Date(y,m-1,1))/864e5);
+  return el>=1?{k,f:dim/el,days:Math.floor(el),dim}:null})();
+function projOf(x){
+  const f=PJ.f,p=X[prevKey(x.k)]||{},sc=v=>ok(v)?v*f:null,o={...x};
+  ['rev','newSales','recurring','newSubs','spend','churn'].forEach(key=>o[key]=sc(x[key]));
+  if(ok(x.gp))o.gp=x.gp*f;
+  o.net=ok(o.newSubs)&&ok(o.churn)?o.newSubs-o.churn:x.net;
+  o.subs=ok(p.subs)&&ok(o.net)?p.subs+o.net:x.subs;
+  o.churnPct=ok(o.churn)&&p.subs?o.churn/p.subs:null;
+  o.arpu=ok(o.rev)&&o.subs?o.rev/o.subs:null;
+  o.cpa=ok(o.spend)&&o.newSubs?o.spend/o.newSubs:null;
+  o.incNew=ok(o.newSales)&&o.newSubs?o.newSales/o.newSubs:null;
+  o.gpSub=ok(o.gp)&&o.subs?o.gp/o.subs:null;
+  o.payback=ok(o.cpa)&&o.gpSub>0?o.cpa/o.gpSub:null;
+  return o;
+}
+function dlt(cur,prev,dir=1,kind='pct'){
   let d='<span class="flat">no comparison</span>';
   if(st.cmp&&ok(cur)&&ok(prev)){
     let txt,diff;
@@ -208,33 +234,43 @@ function tile(label,val,cur,prev,dir=1,kind='pct',hint=''){
     if(diff===0&&(prev||kind!=='pct'))d=`<span class="flat">no change vs ${mls(st.cmp)}</span>`;
     else if(prev||kind!=='pct'){const cls=diff===0||dir===0?'flat':(diff>0)===(dir>0)?'up':'down';d=`<span class="${cls}">${diff>=0?'▲':'▼'} ${txt}</span><span>vs ${mls(st.cmp)}</span>`}
   }
-  return `<div class="kpi"><span class="lbl">${label}</span><span class="v">${val}</span><span class="delta">${d}</span>${hint?`<span class="hint">${hint}</span>`:''}</div>`;
+  return d;
+}
+// pj = [projected text, projected number] for the month in progress
+function tile(label,val,cur,prev,dir=1,kind='pct',hint='',pj=null){
+  const pl=pj&&pj[0]&&pj[0]!=='–'?`<span class="pj"><span class="pjl">Projected ${mls(st.month)}</span><b>${pj[0]}</b><span class="delta">${dlt(pj[1],prev,dir,kind)}</span></span>`:'';
+  return `<div class="kpi"><span class="lbl">${label}</span><span class="v">${val}</span><span class="delta">${dlt(cur,prev,dir,kind)}</span>${pl}${hint?`<span class="hint">${hint}</span>`:''}</div>`;
 }
 function renderKpis(){
-  const x=X[st.month],p=st.cmp?X[st.cmp]:{};
-  $('#sub').textContent=`${ml(st.month)}${st.cmp?' compared with '+ml(st.cmp):''} · data ${ml(keys[0])} to ${ml(keys.at(-1))}`;
+  const x=X[st.month],p0=st.cmp?X[st.cmp]:{};
+  const pjOn=!!PJ&&st.month===PJ.k,y=pjOn?projOf(x):null;
+  const p=PJ&&st.cmp===PJ.k?projOf(p0):p0;   // comparing against the month in progress: use its projection
+  const P=(txt,v)=>pjOn?[txt,v]:null;
+  $('#sub').textContent=`${ml(st.month)}${st.cmp?' compared with '+ml(st.cmp):''} · data ${ml(keys[0])} to ${ml(keys.at(-1))}${pjOn?` · ${ml(st.month)} is month to date (${PJ.days} of ${PJ.dim} days); projections assume the same daily pace`:''}`;
+  const sgn=v=>ok(v)?(v>0?'+':'')+fn(v):'–';
   $('#k-sales').innerHTML=[
-    tile('Revenue',fm(x.rev),x.rev,p.rev),
-    tile('New-customer sales',fm(x.newSales),x.newSales,p.newSales,1,'pct',x.live?'initial charge + credit, enrollments report':'first payments (workbook)'),
-    tile('Recurring revenue',fm(x.recurring),x.recurring,p.recurring),
+    tile('Revenue',fm(x.rev),x.rev,p.rev,1,'pct','',P(fm(y?.rev),y?.rev)),
+    tile('New-customer sales',fm(x.newSales),x.newSales,p.newSales,1,'pct',x.live?'initial charge + credit, enrollments report':'first payments (workbook)',P(fm(y?.newSales),y?.newSales)),
+    tile('Recurring revenue',fm(x.recurring),x.recurring,p.recurring,1,'pct','',P(fm(y?.recurring),y?.recurring)),
     tile('Share of company sales',fp(x.share),x.share,p.share,1,'pts',ok(x.vsRest)?`${fp(x.vsRest)} of the rest of 011`:''),
     tile('Gross margin',fp(x.gm),x.gm,p.gm,1,'pts','package tab cost only'),
   ].join('').replace('<div class="kpi">','<div class="kpi lead">');
   $('#k-cust').innerHTML=[
-    tile('Active subscribers',fn(x.subs),x.subs,p.subs),
-    tile('New subscribers',fn(x.newSubs),x.newSubs,p.newSubs,1,'pct',x.live?'enrollments this month':''),
-    tile('Churned',fn(x.churn),x.churn,p.churn,-1,'pct',ok(x.churnPct)?fp(x.churnPct)+' of last month':''),
-    tile('Net change',ok(x.net)?(x.net>0?'+':'')+fn(x.net):'–',x.net,p.net,1,'abs'),
-    tile('Revenue per subscriber',f2(x.arpu),x.arpu,p.arpu),
+    tile('Active subscribers',fn(x.subs),x.subs,p.subs,1,'pct','',P(fn(y?.subs),y?.subs)),
+    tile('New subscribers',fn(x.newSubs),x.newSubs,p.newSubs,1,'pct',x.live?'enrollments this month':'',P(fn(y?.newSubs),y?.newSubs)),
+    tile('Churned',fn(x.churn),x.churn,p.churn,-1,'pct',ok(x.churnPct)?fp(x.churnPct)+' of last month':'',P(fn(y?.churn)+(ok(y?.churnPct)?' · '+fp(y.churnPct):''),y?.churn)),
+    tile('Net change',sgn(x.net),x.net,p.net,1,'abs','',P(sgn(y?.net),y?.net)),
+    tile('Revenue per subscriber',f2(x.arpu),x.arpu,p.arpu,1,'pct','',P(f2(y?.arpu),y?.arpu)),
   ].join('');
   const[lk,lv]=latestLtv(st.month);const lc=ok(lv)&&x.cpa?lv/x.cpa:null,pc=st.cmp?(()=>{const[,pv]=latestLtv(st.cmp);return ok(pv)&&p.cpa?pv/p.cpa:null})():null;
+  const ylc=y&&ok(lv)&&y.cpa?lv/y.cpa:null;
   $('#k-acq').innerHTML=[
-    tile('Marketing spend',fm(x.spend),x.spend,p.spend,0,'pct',x.liveSpend?'Google Ads + Meta, USD':''),
-    tile('CPA',f2(x.cpa),x.cpa,p.cpa,-1),
-    tile('First-month income per new customer',f2(x.incNew),x.incNew,p.incNew),
+    tile('Marketing spend',fm(x.spend),x.spend,p.spend,0,'pct',x.liveSpend?'Google Ads + Meta, USD':'',P(fm(y?.spend),y?.spend)),
+    tile('CPA',f2(x.cpa),x.cpa,p.cpa,-1,'pct','',P(f2(y?.cpa),y?.cpa)),
+    tile('First-month income per new customer',f2(x.incNew),x.incNew,p.incNew,1,'pct','',P(f2(y?.incNew),y?.incNew)),
     tile('LTV (margin)',f2(lv),lv,st.cmp?latestLtv(st.cmp)[1]:null,1,'pct',lk?(lk===st.month?'all countries':'latest: '+ml(lk)):'no LTV data'),
-    tile('LTV ÷ CPA',fx(lc),lc,pc),
-    tile('Payback',ok(x.payback)?x.payback.toFixed(1)+' mo':'–',x.payback,p.payback,-1,'pct','CPA ÷ monthly gross profit per subscriber'),
+    tile('LTV ÷ CPA',fx(lc),lc,pc,1,'pct','',P(fx(ylc),ylc)),
+    tile('Payback',ok(x.payback)?x.payback.toFixed(1)+' mo':'–',x.payback,p.payback,-1,'pct','CPA ÷ monthly gross profit per subscriber',P(ok(y?.payback)?y.payback.toFixed(1)+' mo':'–',y?.payback)),
   ].join('');
 }
 
