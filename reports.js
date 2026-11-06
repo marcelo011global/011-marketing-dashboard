@@ -5,6 +5,7 @@
 //   coll        'mkt_subs' …
 //   dims        [{key, label, filter?}]   breakdowns (tables) and, with filter:true, filter dropdowns
 //   measures    [{key, label, fmt:'int'|'usd'}]  the first one leads (charts, shares, sorting)
+//   derive      optional fn(row) that adds computed fields (e.g. country from the plan name) before anything is drawn
 // Layout: filters → KPI strip → trend chart → one ranked table per breakdown.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -82,6 +83,7 @@ export function initReport(cfg){
 }
 
 function start(cfg, data){
+  if (cfg.derive) Object.values(data.months).forEach(rows => rows.forEach(cfg.derive));
   const keys = Object.keys(data.months).sort();
   const lead = cfg.measures[0];
   const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], f: {}, open: {}, view: cfg.view || 'monthly' };
