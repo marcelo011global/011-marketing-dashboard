@@ -5,6 +5,7 @@
 //   coll        'mkt_subs' …
 //   dims        [{key, label, filter?}]   breakdowns (tables) and, with filter:true, filter dropdowns
 //   measures    [{key, label, fmt:'int'|'usd'}]  the first one leads (charts, shares, sorting)
+//   stack       optional {key, series:[{v, label, color}]}: split the trend bars into colored parts
 //   derive      optional fn(row) that adds computed fields (e.g. country from the plan name) before anything is drawn
 // Layout: filters → KPI strip → trend chart → one ranked table per breakdown.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -135,28 +136,32 @@ function start(cfg, data){
     }).join('') + extra.map(k => `<div class="kpi"><span class="lbl">${esc(k.label)}</span><span class="v">${esc(k.value)}</span>${k.note ? `<span class="delta">${esc(k.note)}</span>` : ''}</div>`).join('');
 
     // Trend: Daily = one bar per day of the selected months; Monthly = every month, the selection highlighted.
-    let labels, vals, colors;
+    // cfg.stack {key, series:[{v, label, color}]} splits each bar into colored parts (e.g. eSIM vs SIM).
+    const series = cfg.stack ? cfg.stack.series.map(x => ({ ...x, f: r => String(r[cfg.stack.key]) === x.v })) : [{ label: lead.label, color: '#EE7805', f: () => true }];
+    let labels, sets;
     if (st.view === 'daily') {
-      const by = {}; cur.forEach(r => by[r.day] = (by[r.day] || 0) + (+r[lead.key] || 0));
       const lastDay = new Date().toISOString().slice(0, 10), dates = [];
       inRange.forEach(k => { const [y, m] = k.split('-').map(Number); for (let d = 1; d <= new Date(y, m, 0).getDate(); d++) { const ds = k + '-' + String(d).padStart(2, '0'); if (ds < lastDay) dates.push(ds); } });
       labels = dates.map(ds => n === 1 ? String(+ds.slice(8)) : MN[+ds.slice(5, 7) - 1] + ' ' + +ds.slice(8));
-      vals = dates.map(ds => by[ds] || 0);
-      colors = dates.map(() => '#EE7805');
+      sets = series.map(x => { const by = {}; cur.filter(x.f).forEach(r => by[r.day] = (by[r.day] || 0) + (+r[lead.key] || 0)); return { label: x.label, data: dates.map(ds => by[ds] || 0), backgroundColor: x.color }; });
       $('trendTitle').textContent = lead.label + ' per day';
     } else {
       labels = keys.map(monthName);
-      vals = keys.map(k => sum(data.months[k].filter(pass), lead.key));
-      colors = keys.map(k => k >= st.from && k <= st.to ? '#EE7805' : '#D4D4D0');
+      const inSel = k => k >= st.from && k <= st.to;
+      sets = series.map(x => ({ label: x.label, data: keys.map(k => sum(data.months[k].filter(pass).filter(x.f), lead.key)),
+        backgroundColor: keys.map(k => inSel(k) ? x.color : (cfg.stack ? x.color + '55' : '#D4D4D0')) }));
       $('trendTitle').textContent = lead.label + ' per month';
     }
+    const stacked = !!cfg.stack;
     if (chart) chart.destroy();
     chart = new Chart($('trend'), {
       type: 'bar',
-      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 3 }] },
-      options: { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: c => FMT[lead.fmt](c.parsed.y) } } },
-        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: v => FMT[lead.fmt](v) } } } },
+      data: { labels, datasets: sets.map(d => ({ ...d, borderRadius: stacked ? 0 : 3, stack: 's' })) },
+      options: { maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: stacked, position: 'top', align: 'start', labels: { boxWidth: 10, boxHeight: 10, generateLabels: c => c.data.datasets.map((d, i) => ({ text: d.label, fillStyle: series[i].color, strokeStyle: series[i].color, lineWidth: 0, datasetIndex: i, hidden: !c.isDatasetVisible(i) })) } },
+          tooltip: { callbacks: { label: c => (stacked ? ' ' + c.dataset.label + ': ' : '') + FMT[lead.fmt](c.parsed.y) + (stacked ? ' (' + pct(c.parsed.y / (c.chart.data.datasets.reduce((t, d) => t + (d.data[c.dataIndex] || 0), 0) || 1)) + ')' : ''),
+            footer: it => stacked ? 'Total: ' + FMT[lead.fmt](it.reduce((t, i) => t + i.parsed.y, 0)) : '' } } },
+        scales: { x: { stacked, grid: { display: false } }, y: { stacked, beginAtZero: true, ticks: { callback: v => FMT[lead.fmt](v) } } } },
     });
 
     // Month-by-month table (Monthly view), then one ranked table per breakdown.

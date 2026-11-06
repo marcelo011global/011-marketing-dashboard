@@ -60,7 +60,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="report-pdf.js"></script>
 <script type="module">
-import { initReport } from './reports.js?v=202611061137';
+import { initReport } from './reports.js?v=202611061203';
 initReport({
   title: 'Globusim', coll: 'mkt_sims', months: 12,
   // Country or region, read from the plan name (GS_India_10GB → India); Tessler, Itrek and annatel plans are Israel.
@@ -72,6 +72,7 @@ initReport({
       c = out.length && !/^SimPlan/i.test(p) ? out.join(' ') : 'Other'; }
     r.country = c;
     r.kind = /esim/i.test(p) ? 'eSIM' : 'SIM'; },   // anything without "eSIM" in the plan name is a physical SIM
+  stack: { key: 'kind', series: [{ v: 'SIM', label: 'SIM (physical)', color: '#3A6EA5' }, { v: 'eSIM', label: 'eSIM', color: '#EE7805' }] },
   dims: [{ key: 'country', label: 'Country / region', filter: true }, { key: 'kind', label: 'eSIM vs SIM', filter: true }, { key: 'plan', label: 'Plan', filter: true }, { key: 'creator', label: 'Creator', filter: true }, { key: 'shipping', label: 'Shipping', filter: true }, { key: 'coupon', label: 'Coupon' }],
   measures: [{ key: 'sims', label: 'SIMs activated', fmt: 'int' }, { key: 'amount', label: 'Revenue', fmt: 'usd' }],
   kpis: (cur, prev, sum) => { const s = sum(cur, 'sims'); return [
