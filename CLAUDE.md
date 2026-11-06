@@ -158,3 +158,6 @@ and ARPU always uses calling-package revenue. Landing pages and Reviews are sub-
 
 ### Cache busting
 Pages import the shared modules as `./reports.js?v=…` / `./sales-data.js?v=…`. Bump the `v` in every page whenever reports.js or sales-data.js changes, or browsers can pair a new page with a stale module for up to 10 minutes (GitHub Pages cache).
+
+### Navigation
+Top tabs: Sales · VNUMBER · Subscribers · Recharge · Globusim · Paid media. Paid media (index.html) has sub-tabs Markets (#/performance, incl. #/market/<id>) · Campaigns · Landing pages · Reviews; the review count badge sits on the Paid media tab.

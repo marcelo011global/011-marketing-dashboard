@@ -270,13 +270,12 @@ h1 .bchip{font-size:12px;vertical-align:4px;}
         <img src="logo.png" alt="011 Global" class="logo-img">
       </a>
       <span class="app-name">Marketing</span>
-      <a class="nav-btn" id="nav-performance" href="#/performance">Markets</a>
-      <a class="nav-btn" id="nav-campaigns" href="#/campaigns">Campaigns <span class="count" id="nav-count" style="display:none" title="Proposals waiting for review"></span></a>
       <a class="nav-btn" id="nav-sales" href="sales.html">Sales</a>
       <a class="nav-btn" id="nav-vnumber" href="vnumber.html">VNUMBER</a>
       <a class="nav-btn" href="subscribers.html">Subscribers</a>
       <a class="nav-btn" href="recharge.html">Recharge</a>
       <a class="nav-btn" href="sims.html">Globusim</a>
+      <a class="nav-btn" id="nav-paid" href="#/performance">Paid media <span class="count" id="nav-count" style="display:none" title="Proposals waiting for review"></span></a>
     </div>
     <div class="topbar-right">
       <span id="mode-pill" class="pill" style="display:none"></span>
@@ -1141,18 +1140,17 @@ function render(){
   cnt.textContent = n; cnt.style.display = n ? '' : 'none';
 
   const [, section = 'performance', a, b] = (location.hash || '#/performance').split('/');
-  document.getElementById('nav-performance').classList.toggle('active', section === 'performance' || section === 'market');
-  // Landing pages and Reviews live under Campaigns, as sub-tabs.
-  const inCamp = ['campaigns', 'pages', 'reviews'].includes(section);
-  document.getElementById('nav-campaigns').classList.toggle('active', inCamp);
-  const sub = inCamp ? `<nav class="subnav" aria-label="Campaigns sections">${[['campaigns', 'Campaigns'], ['pages', 'Landing pages'], ['reviews', 'Reviews']]
-    .map(([k, l]) => `<a href="#/${k}" class="${section === k ? 'active' : ''}"${section === k ? ' aria-current="page"' : ''}>${l}${k === 'reviews' && n ? ` <span class="count">${n}</span>` : ''}</a>`).join('')}</nav>` : '';
+  // Paid media = one top tab; Markets, Campaigns, Landing pages and Reviews are its sub-tabs.
+  document.getElementById('nav-paid').classList.add('active');
+  const subOn = k => k === section || (k === 'performance' && section === 'market');
+  const sub = `<nav class="subnav" aria-label="Paid media sections">${[['performance', 'Markets'], ['campaigns', 'Campaigns'], ['pages', 'Landing pages'], ['reviews', 'Reviews']]
+    .map(([k, l]) => `<a href="#/${k}" class="${subOn(k) ? 'active' : ''}"${subOn(k) ? ' aria-current="page"' : ''}>${l}${k === 'reviews' && n ? ` <span class="count">${n}</span>` : ''}</a>`).join('')}</nav>`;
   const y = window.scrollY, same = render.last === location.hash;
-  if (section === 'market') { view.innerHTML = viewMarket(a); drawCharts(); }
+  if (section === 'market') { view.innerHTML = sub + viewMarket(a); drawCharts(); }
   else if (section === 'campaigns') { view.innerHTML = sub + viewCampaigns(); drawCharts(); }
   else if (section === 'pages') view.innerHTML = sub + viewPages();
   else if (section === 'reviews') view.innerHTML = sub + viewReviews(a || 'pending', b);
-  else view.innerHTML = viewPerformance();
+  else view.innerHTML = sub + viewPerformance();
   window.scrollTo(0, same ? y : 0);
   render.last = location.hash;
 }
