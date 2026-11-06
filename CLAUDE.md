@@ -155,3 +155,6 @@ and ARPU always uses calling-package revenue. Landing pages and Reviews are sub-
 - One top-nav tab "VNUMBER" with sub-tabs Business overview (vnumber.html) / Enrollments (enrollments.html); enrollments are VNUMBER only.
 - vnumber.html loads extras via `initPage({load:{vn:true}})` → `loadVn()` in sales-data.js: mkt_vnEnroll (new subscribers = Σcount, new-customer sales = Σ(amount + credit)) and mkt_dailyStats for mkt_markets with brand 'vnumber' (spend in USD via usdRate; only months fully covered by the ad data).
 - These override the workbook's Vnumber Summary tab where present; older months fall back to it. Recurring = revenue − new-customer sales; churned = last month's active + new − this month's active; CPA = spend ÷ new subs; first-month income = new-customer sales ÷ new subs.
+
+### Cache busting
+Pages import the shared modules as `./reports.js?v=…` / `./sales-data.js?v=…`. Bump the `v` in every page whenever reports.js or sales-data.js changes, or browsers can pair a new page with a stale module for up to 10 minutes (GitHub Pages cache).
