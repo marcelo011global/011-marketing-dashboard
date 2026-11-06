@@ -70,10 +70,12 @@ initReport({
     else { const t = p.replace(/^(GS|WS)_/i, '').replace(/^eSIM_/i, '').split('_'), out = [];
       for (const w of t) { if (/^\d+(GB|MB)$/i.test(w) || /^(UNL|DID|family|Roamability|annatel|Agent|physical|SIM|eSIM|with|no|data|\d+)$/i.test(w)) break; out.push(w); }
       c = out.length && !/^SimPlan/i.test(p) ? out.join(' ') : 'Other'; }
-    r.country = c; },
-  dims: [{ key: 'country', label: 'Country / region', filter: true }, { key: 'plan', label: 'Plan', filter: true }, { key: 'creator', label: 'Creator', filter: true }, { key: 'shipping', label: 'Shipping', filter: true }, { key: 'coupon', label: 'Coupon' }],
+    r.country = c;
+    r.kind = /esim/i.test(p) ? 'eSIM' : 'SIM'; },   // anything without "eSIM" in the plan name is a physical SIM
+  dims: [{ key: 'country', label: 'Country / region', filter: true }, { key: 'kind', label: 'eSIM vs SIM', filter: true }, { key: 'plan', label: 'Plan', filter: true }, { key: 'creator', label: 'Creator', filter: true }, { key: 'shipping', label: 'Shipping', filter: true }, { key: 'coupon', label: 'Coupon' }],
   measures: [{ key: 'sims', label: 'SIMs activated', fmt: 'int' }, { key: 'amount', label: 'Revenue', fmt: 'usd' }],
   kpis: (cur, prev, sum) => { const s = sum(cur, 'sims'); return [
+    { label: 'eSIM share', value: s ? (sum(cur.filter(r => r.kind === 'eSIM'), 'sims') / s * 100).toFixed(1) + '%' : '—', note: s ? sum(cur.filter(r => r.kind === 'eSIM'), 'sims').toLocaleString('en-US') + ' eSIMs · ' + sum(cur.filter(r => r.kind !== 'eSIM'), 'sims').toLocaleString('en-US') + ' SIMs' : '' },
     { label: 'Avg revenue per SIM', value: s ? '$' + (sum(cur, 'amount') / s).toFixed(2) : '—' },
     { label: 'Avg plan length', value: s ? Math.round(sum(cur, 'days') / s) + ' days' : '—' },
     { label: 'Coupon discounts', value: '$' + Math.abs(sum(cur, 'couponAmount')).toLocaleString('en-US', { maximumFractionDigits: 0 }) }]; },
