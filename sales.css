@@ -125,3 +125,9 @@ body.pdf th,body.pdf td{padding:6px 6px}
 body.pdf td{font-size:12px}
 body.pdf td.name{max-width:260px}
 body.pdf input[type=search]:placeholder-shown{display:none}
+
+/* Sub-tabs inside a section (VNUMBER: Business overview / Enrollments) */
+.subnav{display:inline-flex;gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:3px;justify-self:start;flex-wrap:wrap}
+.subnav a{padding:6px 12px;border-radius:5px;font-size:13px;font-weight:600;color:var(--fg3);text-decoration:none}
+.subnav a:hover{color:var(--fg)}
+.subnav a.active{background:var(--brand-soft);color:var(--brand-ink)}

@@ -30,7 +30,6 @@ td.l{text-align:left;font-family:var(--body)}
     <a class="nav-btn" href="index.html#/campaigns">Campaigns</a>
     <a class="nav-btn" href="sales.html">Sales</a>
     <a class="nav-btn active" href="vnumber.html">VNUMBER</a>
-    <a class="nav-btn" href="enrollments.html">Enrollments</a>
     <a class="nav-btn" href="subscribers.html">Subscribers</a>
     <a class="nav-btn" href="recharge.html">Recharge</a>
     <a class="nav-btn" href="sims.html">SIMs</a>
@@ -45,6 +44,7 @@ td.l{text-align:left;font-family:var(--body)}
 <input type="file" id="file" accept=".xlsx,.xls" hidden>
 
 <div class="wrap" id="app" hidden>
+  <nav class="subnav" aria-label="VNUMBER sections"><a href="vnumber.html" class="active" aria-current="page">Business overview</a><a href="enrollments.html">Enrollments</a></nav>
   <header class="top">
     <div>
       <div class="brand"><i></i>VNUMBER · Virtual numbers</div>
@@ -122,7 +122,7 @@ td.l{text-align:left;font-family:var(--body)}
     <div class="tbl mtbl"><table class="monthly" id="t-month"></table></div>
   </section>
 
-  <footer>Sources: the monthly report's “Vnumber Summary” tab (revenue, first-month sales, marketing spend, subscribers, new subscribers), “LTV” tab (margin LTV by DID country) and package tab (packages named Vnumber_…, cost and company totals). Recurring = revenue − first-month sales. Churned = last month's subscribers + new − this month's. CPA = marketing spend ÷ new subscribers (all channels). Payback = CPA ÷ gross profit per subscriber per month.</footer>
+  <footer>Sources: new subscribers and new-customer sales come from the VNUMBER enrollments report (Reports API; new-customer sales = initial charge + credit), marketing spend from the Google Ads and Meta syncs for the VNUMBER accounts (USD), revenue, subscribers and cost from the VNUMBER packages (packages named Vnumber_…) in the package report, and LTV from the workbook's “LTV” tab. Months before the live feeds start use the workbook's “Vnumber Summary” tab. Recurring = revenue − new-customer sales. Churned = last month's active subscribers + new − this month's active. CPA = marketing spend ÷ new subscribers. First-month income = new-customer sales ÷ new subscribers. Payback = CPA ÷ gross profit per subscriber per month. The current month is month to date.</footer>
 </div>
 
 <div id="toast" hidden></div>
@@ -157,11 +157,20 @@ for(const[k,rows] of Object.entries(V.sales||{})){
 }
 const S=V.summary||{};
 const L=V.ltv;const ltvAt={};if(L&&L.total)L.months.forEach((k,i)=>{if(ok(L.total[i]))ltvAt[k]=L.total[i]});
-const keys=[...new Set([...Object.keys(S),...Object.keys(salesBy)])].sort();
+// From the live feeds, where they cover the month (older months fall back to the workbook's Vnumber Summary tab):
+//  enrollments report → new subscribers (enrollments) and new-customer sales (initial charge + credit);
+//  Google Ads / Meta syncs → marketing spend in USD, for months the ad data fully covers.
+const EN={};for(const[k,rows] of Object.entries(V.vnEnroll||{})){let n=0,a=0;for(const r of rows){n+=+r.count||0;a+=(+r.amount||0)+(+r.credit||0)}if(rows.length)EN[k]={newSubs:n,newSales:a}}
+const SP=V.vnSpend?.months||{},spF=V.vnSpend?.first||null;
+const spStart=spF?(spF.endsWith('-01')?spF.slice(0,7):(()=>{let[y,m]=spF.slice(0,7).split('-').map(Number);m++;if(m>12){m=1;y++}return y+'-'+String(m).padStart(2,'0')})()):null;
+const nowK=new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'}).slice(0,7);
+const spendOf=k=>spStart&&k>=spStart&&k<=nowK?(SP[k]||0):null;
+const keys=[...new Set([...Object.keys(S),...Object.keys(salesBy),...Object.keys(EN)])].sort();
 const X={};
 for(const k of keys){
   const s=S[k]||{},b=salesBy[k]||null,p=X[prevKey(k)];
-  const x={k,rev:s.rev??b?.vnRev??null,newSales:s.newSales??null,spend:s.spend??null,subs:s.subs??b?.vnSubs??null,newSubs:s.newSubs??null};
+  const e=EN[k],sp=spendOf(k);
+  const x={k,rev:s.rev??b?.vnRev??null,newSales:e?e.newSales:s.newSales??null,spend:sp??s.spend??null,subs:s.subs??b?.vnSubs??null,newSubs:e?e.newSubs:s.newSubs??null,live:!!e,liveSpend:sp!=null};
   x.recurring=ok(x.rev)&&ok(x.newSales)?x.rev-x.newSales:null;
   x.churn=p&&ok(p.subs)&&ok(x.subs)&&ok(x.newSubs)?p.subs+x.newSubs-x.subs:null;
   x.churnPct=ok(x.churn)&&p.subs?x.churn/p.subs:null;
@@ -207,21 +216,21 @@ function renderKpis(){
   $('#sub').textContent=`${ml(st.month)}${st.cmp?' compared with '+ml(st.cmp):''} · data ${ml(keys[0])} to ${ml(keys.at(-1))}`;
   $('#k-sales').innerHTML=[
     tile('Revenue',fm(x.rev),x.rev,p.rev),
-    tile('New-customer sales',fm(x.newSales),x.newSales,p.newSales,1,'pct','first payments'),
+    tile('New-customer sales',fm(x.newSales),x.newSales,p.newSales,1,'pct',x.live?'initial charge + credit, enrollments report':'first payments (workbook)'),
     tile('Recurring revenue',fm(x.recurring),x.recurring,p.recurring),
     tile('Share of company sales',fp(x.share),x.share,p.share,1,'pts',ok(x.vsRest)?`${fp(x.vsRest)} of the rest of 011`:''),
     tile('Gross margin',fp(x.gm),x.gm,p.gm,1,'pts','package tab cost only'),
   ].join('').replace('<div class="kpi">','<div class="kpi lead">');
   $('#k-cust').innerHTML=[
     tile('Active subscribers',fn(x.subs),x.subs,p.subs),
-    tile('New subscribers',fn(x.newSubs),x.newSubs,p.newSubs),
+    tile('New subscribers',fn(x.newSubs),x.newSubs,p.newSubs,1,'pct',x.live?'enrollments this month':''),
     tile('Churned',fn(x.churn),x.churn,p.churn,-1,'pct',ok(x.churnPct)?fp(x.churnPct)+' of last month':''),
     tile('Net change',ok(x.net)?(x.net>0?'+':'')+fn(x.net):'–',x.net,p.net,1,'abs'),
     tile('Revenue per subscriber',f2(x.arpu),x.arpu,p.arpu),
   ].join('');
   const[lk,lv]=latestLtv(st.month);const lc=ok(lv)&&x.cpa?lv/x.cpa:null,pc=st.cmp?(()=>{const[,pv]=latestLtv(st.cmp);return ok(pv)&&p.cpa?pv/p.cpa:null})():null;
   $('#k-acq').innerHTML=[
-    tile('Marketing spend',fm(x.spend),x.spend,p.spend,0),
+    tile('Marketing spend',fm(x.spend),x.spend,p.spend,0,'pct',x.liveSpend?'Google Ads + Meta, USD':''),
     tile('CPA',f2(x.cpa),x.cpa,p.cpa,-1),
     tile('First-month income per new customer',f2(x.incNew),x.incNew,p.incNew),
     tile('LTV (margin)',f2(lv),lv,st.cmp?latestLtv(st.cmp)[1]:null,1,'pct',lk?(lk===st.month?'all countries':'latest: '+ml(lk)):'no LTV data'),
@@ -296,6 +305,7 @@ initPage({
   title: 'VNUMBER',
   emptyText: 'No VNUMBER data has been uploaded yet. Upload the monthly Package Profitability workbook (.xlsx). This page uses its “Vnumber Summary” and “LTV” tabs and the VNUMBER packages in the main tab.',
   ready: d => !!(d.summary && Object.keys(d.summary).length) || Object.values(d.sales || {}).some(rows => rows.some(r => r[2].startsWith('Vnumber_'))),
+  load: { vn: true },
   render: d => window.startVnumber(d),
 });
 </script>

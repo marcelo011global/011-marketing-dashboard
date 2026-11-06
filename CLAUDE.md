@@ -150,3 +150,8 @@ adds them as types "SIM activation" (market Globusim, plan = package) and "Mobil
 (no cost in the API); a Product filter switches All / Calling packages / SIM activations / Mobile recharge,
 and ARPU always uses calling-package revenue. Landing pages and Reviews are sub-tabs of Campaigns
 (`.subnav` in index.html); their old #/pages and #/reviews routes still work.
+
+### VNUMBER tab (vnumber.html + enrollments.html)
+- One top-nav tab "VNUMBER" with sub-tabs Business overview (vnumber.html) / Enrollments (enrollments.html); enrollments are VNUMBER only.
+- vnumber.html loads extras via `initPage({load:{vn:true}})` → `loadVn()` in sales-data.js: mkt_vnEnroll (new subscribers = Σcount, new-customer sales = Σ(amount + credit)) and mkt_dailyStats for mkt_markets with brand 'vnumber' (spend in USD via usdRate; only months fully covered by the ad data).
+- These override the workbook's Vnumber Summary tab where present; older months fall back to it. Recurring = revenue − new-customer sales; churned = last month's active + new − this month's active; CPA = spend ÷ new subs; first-month income = new-customer sales ÷ new subs.

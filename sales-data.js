@@ -7,7 +7,7 @@
 // Sales figures are never committed to the repo (.gitignore blocks *.xlsx and preview files).
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDocs, getDoc, writeBatch, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDocs, getDoc, writeBatch, serverTimestamp, setDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({
   apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
@@ -113,7 +113,24 @@ export function parseWorkbook(buf){
 }
 
 // ── Firestore ──
-export async function loadAll(){
+// VNUMBER extras: enrollments (Reports API) and ad spend (Google Ads / Meta syncs) per month, in USD.
+async function loadVn(){
+  const [en, mk] = await Promise.all([getDocs(collection(db, 'mkt_vnEnroll')).catch(() => null), getDocs(collection(db, 'mkt_markets')).catch(() => null)]);
+  const vnEnroll = {};
+  en?.forEach(d => { const x = d.data(), cols = JSON.parse(x.cols || '[]'); vnEnroll[x.month || d.id] = JSON.parse(x.rows || '[]').map(r => Object.fromEntries(cols.map((c, i) => [c, r[i]]))); });
+  const ms = []; mk?.forEach(d => { const x = d.data(); if (x.brand === 'vnumber') ms.push({ id: d.id, rate: +x.usdRate || 1 }); });
+  let vnSpend = null;
+  if (ms.length) {
+    const st = await getDocs(query(collection(db, 'mkt_dailyStats'), where('marketId', 'in', ms.map(m => m.id)))).catch(() => null);
+    const rate = Object.fromEntries(ms.map(m => [m.id, m.rate])), months = {}; let first = null;
+    st?.forEach(d => { const x = d.data(); if (!x.date) return; const k = x.date.slice(0, 7); months[k] = (months[k] || 0) + (+x.cost || 0) * (rate[x.marketId] || 1); if (!first || x.date < first) first = x.date; });
+    vnSpend = { months, first };
+  }
+  return { vnEnroll, vnSpend };
+}
+
+export async function loadAll(opts = {}){
+  const vn = opts.vn ? loadVn().catch(e => { console.error(e); return {}; }) : null;
   const [snap, metaSnap, sumSnap, ltvSnap, simSnap, mrSnap] = await Promise.all([
     getDocs(collection(db, 'mkt_sales')),
     getDoc(doc(db, 'mkt_salesMeta', 'last')).catch(() => null),
@@ -130,6 +147,7 @@ export async function loadAll(){
   const s = sumSnap?.exists() ? sumSnap.data() : null;
   const l = ltvSnap?.exists() ? ltvSnap.data() : null;
   return {
+    ...(vn ? await vn : {}),
     sales, salesAt, sims: months(simSnap), mr: months(mrSnap), meta: m ? { by: m.by, at: m.at?.toDate?.() } : null,
     summary: s ? JSON.parse(s.months) : null,
     ltv: l ? { months: JSON.parse(l.months), rows: JSON.parse(l.rows), total: l.total ? JSON.parse(l.total) : null } : null,
@@ -197,8 +215,8 @@ export function initPage(opts){
         const p = b ? parseWorkbook(b) : {};
         // Synthetic Reports API data (gitignored preview-data/), if present.
         const pj = f => fetch('preview-data/' + f + '.json').then(r => r.ok ? r.json() : null).catch(() => null);
-        const [ps, sims, mr] = await Promise.all([pj('mkt_sales'), pj('mkt_sims'), pj('mkt_mr')]);
-        current = { sales: p.sales || ps?.months || {}, sims: sims?.months || {}, mr: mr?.months || {}, summary: p.summary || null, ltv: p.ltv || null, meta: null }; show(current);
+        const [ps, sims, mr, ve, vs] = await Promise.all([pj('mkt_sales'), pj('mkt_sims'), pj('mkt_mr'), opts.load?.vn ? pj('mkt_vnEnroll') : null, opts.load?.vn ? pj('vn_spend') : null]);
+        current = { sales: p.sales || ps?.months || {}, sims: sims?.months || {}, mr: mr?.months || {}, vnEnroll: ve?.months || null, vnSpend: vs || null, summary: p.summary || null, ltv: p.ltv || null, meta: null }; show(current);
       })
       .catch(e => { console.error(e); current = { sales: {}, summary: null, ltv: null, meta: null }; show(current); });
     return;
@@ -207,7 +225,7 @@ export function initPage(opts){
     if (!user || !allowedEmail(user.email)) { gate(`<h1>Sign in to continue</h1><p>${opts.title} figures are for 011 Global and 011 Telecom staff. Sign in on the marketing dashboard, then come back here.</p><a class="btn primary" href="index.html">Go to sign in</a>`); return; }
     $('user-display').textContent = user.displayName || user.email;
     gate('<p>Loading…</p>');
-    try { current = await loadAll(); show(current); }
+    try { current = await loadAll(opts.load || {}); show(current); }
     catch (e) {
       console.error(e);
       gate(`<h1>${opts.title} could not load</h1><p>${/permission|insufficient/i.test(e.message || '') ? 'Firestore refused access. The security rules need to allow signed-in staff to read the mkt_sales and mkt_vnumber collections.' : 'Something went wrong while loading. Reload the page to try again.'}</p>`);
