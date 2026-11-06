@@ -161,3 +161,6 @@ Pages import the shared modules as `./reports.js?v=…` / `./sales-data.js?v=…
 
 ### Navigation
 Top tabs: Sales · VNUMBER · Subscribers · Recharge · Globusim · Paid media. Paid media (index.html) has sub-tabs Markets (#/performance, incl. #/market/<id>) · Campaigns · Landing pages · Reviews; the review count badge sits on the Paid media tab.
+
+### Paid media date ranges
+Ranges: 7/30/90 days, 6 and 12 months, this month, last month, this year, custom. The page loads two years of mkt_dailyStats (DATA_START) so 12 months has a prior period; charts switch to weekly points over ~3 months. History depth depends on the syncs: backfill() = 180 days, backfillTwoYears() = 730 days (run once in each Apps Script project). Campaigns sub-tab filters: market, campaign, status, type, name search.

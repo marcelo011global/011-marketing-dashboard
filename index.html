@@ -293,8 +293,11 @@ h1 .bchip{font-size:12px;vertical-align:4px;}
         <option value="7">Last 7 days</option>
         <option value="30">Last 30 days</option>
         <option value="90">Last 90 days</option>
+        <option value="180">Last 6 months</option>
+        <option value="365">Last 12 months</option>
         <option value="mtd">This month</option>
         <option value="lastmonth">Last month</option>
+        <option value="ytd">This year</option>
         <option value="custom">Custom range…</option>
       </select>
       <span id="custom-range" class="custom-range">
@@ -352,7 +355,7 @@ const S = {
   brand: ['all','011global','vnumber'].includes(lsGet('mkt.brand')) ? lsGet('mkt.brand') : 'all',
   reviewMarket: 'all',
   pages: [], pageMarket: 'all', pageForm: null,
-  campMarket: 'all', campSel: new Set(), chartIds: [],
+  campMarket: 'all', campSel: new Set(), chartIds: [], campStatus: 'all', campType: 'all', campQ: '',
   unsubs: [],
 };
 // Sample-mode decisions go to their own collections so they can never be
@@ -487,10 +490,12 @@ function activity(){
 // ─────────────────────── Metrics ───────────────────────
 // Data runs through yesterday. Live mode loads a year of daily stats, so custom
 // ranges (and their prior-period comparison) can reach back that far.
-const DATA_START = () => iso(addDays(today0(), -366));
+// Two years back, so a 12-month range still has the 12 months before it to compare with.
+const DATA_START = () => iso(addDays(today0(), -731));
 function rangeOf(){
   const y = addDays(today0(), -1), t = today0();
   if (S.range === 'mtd') return { start: iso(new Date(y.getFullYear(), y.getMonth(), 1)), end: iso(y) };
+  if (S.range === 'ytd') return { start: iso(new Date(y.getFullYear(), 0, 1)), end: iso(y) };
   if (S.range === 'lastmonth') return { start: iso(new Date(t.getFullYear(), t.getMonth() - 1, 1)), end: iso(new Date(t.getFullYear(), t.getMonth(), 0)) };
   if (S.range === 'custom' && S.from && S.to) return S.from <= S.to ? { start: S.from, end: S.to } : { start: S.to, end: S.from };
   const n = +S.range || 30;
@@ -592,6 +597,9 @@ const campaignById = id => S.campaigns.find(c => c.id === id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const flags = m => `<span class="flags" title="${esc(m.name)}">${(m.flags || []).join('<span class="arrow">→</span>')}</span>`;
 const dShort = s => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
+const dLong = s => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+// "Oct 7 – Nov 5", or with years when the range crosses into another year: "Nov 6, 2025 – Nov 5, 2026"
+const dRange = p => p.start.slice(0, 4) === p.end.slice(0, 4) ? `${dShort(p.start)} – ${dShort(p.end)}` : `${dLong(p.start)} – ${dLong(p.end)}`;
 const dTime = d => d ? d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '';
 function ago(d){
   if (!d) return '';
@@ -681,7 +689,7 @@ function viewPerformance(){
   if (!rows.length) return `<div class="empty">No markets yet${S.brand === 'all' ? '' : ' for ' + esc(BRANDS[S.brand])}.</div>`;
   return `
   <div class="page-head"><div><h1>Performance by market</h1>
-    <div class="sub">${dShort(cur.start)} – ${dShort(cur.end)} · all Google Ads accounts${A.cur === 'USD' && visibleMarkets().some(m => m.currency && m.currency !== 'USD') ? ` · totals in USD (${visibleMarkets().filter(m => m.currency && m.currency !== 'USD').map(m => `1 ${m.currency} = $${(+m.usdRate).toFixed(2)}`).join(', ')})` : ''}</div></div></div>
+    <div class="sub">${dRange(cur)} · all Google Ads accounts${A.cur === 'USD' && visibleMarkets().some(m => m.currency && m.currency !== 'USD') ? ` · totals in USD (${visibleMarkets().filter(m => m.currency && m.currency !== 'USD').map(m => `1 ${m.currency} = $${(+m.usdRate).toFixed(2)}`).join(', ')})` : ''}</div></div></div>
   ${S.mode === 'sample' && visibleMarkets().some(m => m.tracking && m.tracking.status !== 'recording') ? `<div class="alert"><b>Conversion tracking is broken.</b> Google Ads has recorded no purchases since Aug 14, so real conversion numbers are 0 until the site fix ships. Conversion figures here are sample data.</div>` : ''}
   ${kpiRow(A, B)}
   <h2 class="sec">Markets</h2>
@@ -700,7 +708,7 @@ function viewPerformance(){
         <div class="mstat"><div class="l">ROAS</div><div class="v">${fmt.x(M.roas(a))}</div>${delta(M.roas(a), M.roas(b), 'up')}</div>
       </div>
       ${S.platform === 'all' ? splitLine(ids, cur) : ''}
-      <div class="spark"><div class="l"><span>Daily conversions</span><span>${dShort(cur.start)} – ${dShort(cur.end)}</span></div>${sparkline(series)}</div>
+      <div class="spark"><div class="l"><span>Daily conversions</span><span>${dRange(cur)}</span></div>${sparkline(series)}</div>
     </a>`;
   }).join('')}</div>
   <h2 class="sec">Compare markets</h2>
@@ -728,7 +736,7 @@ function viewMarket(id){
   return `
   <a class="crumb" href="#/performance">← All markets</a>
   <div class="page-head"><div style="display:flex;gap:12px;align-items:center">${flags(m).replace('class="flags"', 'class="flags" style="font-size:30px"')}
-    <div><h1>${esc(m.name)} ${bchip(m)}</h1><div class="sub">${esc(m.subtitle || (m.cities || []).join(' · '))}${m.language ? ' · ads in ' + esc(m.language) : ''}${m.currency ? ' · figures in ' + esc(m.currency) : ''} · ${dShort(cur.start)} – ${dShort(cur.end)}</div></div></div></div>
+    <div><h1>${esc(m.name)} ${bchip(m)}</h1><div class="sub">${esc(m.subtitle || (m.cities || []).join(' · '))}${m.language ? ' · ads in ' + esc(m.language) : ''}${m.currency ? ' · figures in ' + esc(m.currency) : ''} · ${dRange(cur)}</div></div></div></div>
   ${m.tracking ? `<div class="card" style="margin-bottom:12px">${trackLine(m, true)}</div>` : ''}
   ${kpiRow(A, B)}
   <div class="charts" style="margin-top:12px">
@@ -788,14 +796,27 @@ function platformSplit(ids, cur, prev){
 function drawCharts(){
   const els = document.querySelectorAll('[data-chart]');
   if (!els.length) return;
-  const cur = curOf(S.chartIds), pts = daily(S.chartIds, period(0), cur);
+  const cur = curOf(S.chartIds), pts = bucketed(daily(S.chartIds, period(0), cur));
   const f = { cost: v => fmt.money(v, cur), clicks: fmt.int, conversions: fmt.int };
   els.forEach(el => { const k = el.dataset.chart; lineChart(el, pts.map(p => ({ date: p.date, v: p[k] })), f[k]); });
+}
+// Ranges over ~3 months draw one point per week (summed, dated by the week's first day) so the line stays readable.
+const WEEKLY = p => spanDays(p) > 92;
+function bucketed(pts){
+  if (!WEEKLY(period(0))) return pts;
+  const out = [];
+  // Weeks counted back from the last day, so the latest point is a full week (only the oldest may be partial).
+  for (let e = pts.length; e > 0; e -= 7) { const g = pts.slice(Math.max(0, e - 7), e), w = { date: g[0].date }; g.forEach(p => { for (const k in p) if (k !== 'date') w[k] = (w[k] || 0) + p[k]; }); out.unshift(w); }
+  return out;
 }
 
 function viewCampaigns(){
   const cur = period(0), prev = period(1), mf = S.campMarket;
-  const inMarket = S.campaigns.filter(c => (mf === 'all' || c.marketId === mf) && inPlatform(c));
+  const q = (S.campQ || '').toLowerCase();
+  const inMarket = S.campaigns.filter(c => (mf === 'all' || c.marketId === mf) && inPlatform(c)
+    && (S.campStatus === 'all' || (S.campStatus === 'active') === (c.status === 'ENABLED'))
+    && (S.campType === 'all' || c.type === S.campType) && (!q || (c.name || '').toLowerCase().includes(q)));
+  const types = [...new Set(S.campaigns.filter(c => (mf === 'all' || c.marketId === mf) && inPlatform(c)).map(c => c.type).filter(Boolean))].sort();
   const list = inMarket.filter(c => S.campSel.has(c.id) || aggFor([c.id], cur).impressions || aggFor([c.id], cur).cost);
   const sel = list.filter(c => S.campSel.has(c.id));
   const ids = idsOf(sel.length ? sel : list);
@@ -807,10 +828,10 @@ function viewCampaigns(){
   const scope = sel.length === 1 ? sel[0].name
     : sel.length ? `${sel.length} selected campaigns`
     : mf === 'all' ? `All ${list.length} campaigns` : `All campaigns in ${marketById(mf)?.name || mf}`;
-  const chart = (k, title) => `<div class="card chart-card"><h3>${title}</h3><div class="csub">${esc(scope)} · per day</div><div class="chart" data-chart="${k}"></div></div>`;
+  const chart = (k, title) => `<div class="card chart-card"><h3>${title}</h3><div class="csub">${esc(scope)} · per ${WEEKLY(cur) ? 'week' : 'day'}</div><div class="chart" data-chart="${k}"></div></div>`;
   return `
   <div class="page-head"><div><h1>Campaigns</h1>
-    <div class="sub">Showing <b>${esc(scope)}</b> · ${dShort(cur.start)} – ${dShort(cur.end)} · figures in ${esc(A.cur)}</div></div></div>
+    <div class="sub">Showing <b>${esc(scope)}</b> · ${dRange(cur)} · figures in ${esc(A.cur)}</div></div></div>
   <div class="filters">
     Market <select class="select" onchange="setCampMarket(this.value)">
       <option value="all">All markets</option>
@@ -821,6 +842,17 @@ function viewCampaigns(){
       ${list.map(c => `<option value="${esc(c.id)}" ${sel.length === 1 && sel[0].id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
     </select>
     ${sel.length ? `<button class="btn" onclick="setCampOne('')">Show all</button>` : ''}
+  </div>
+  <div class="filters">
+    Status <select class="select" onchange="setCampFilter('campStatus', this.value)">
+      ${[['all', 'All'], ['active', 'Active'], ['paused', 'Paused']].map(([v, l]) => `<option value="${v}" ${S.campStatus === v ? 'selected' : ''}>${l}</option>`).join('')}
+    </select>
+    Type <select class="select" onchange="setCampFilter('campType', this.value)">
+      <option value="all">All types</option>
+      ${types.map(t => `<option value="${esc(t)}" ${S.campType === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}
+    </select>
+    <input class="select" type="search" id="camp-q" placeholder="Search campaign name" value="${esc(S.campQ || '')}" oninput="setCampQ(this.value)" aria-label="Search campaign name" style="min-width:200px">
+    ${S.campStatus !== 'all' || S.campType !== 'all' || S.campQ ? `<button class="btn" onclick="clearCampFilters()">Clear filters</button>` : ''}
     <span>Tick several campaigns in the table below to combine them.</span>
   </div>
   ${kpiRow(A, B, [KPI.cost, KPI.clicks, KPI.conversions, KPI.cpa, KPI.ctr, KPI.roas])}
@@ -1099,6 +1131,11 @@ window.setBrand = v => {
 window.setPlatform = v => { S.platform = v; lsSet('mkt.platform', v); S.campSel = new Set(); render(); };
 window.setReviewMarket = v => { S.reviewMarket = v; render(); };
 window.setCampMarket = v => { S.campMarket = v; S.campSel = new Set(); render(); };
+window.setCampFilter = (k, v) => { S[k] = v; S.campSel = new Set(); render(); };
+let campQT;
+window.setCampQ = v => { clearTimeout(campQT); campQT = setTimeout(() => { S.campQ = v.trim(); S.campSel = new Set(); render();
+  const el = document.getElementById('camp-q'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 250); };
+window.clearCampFilters = () => { S.campStatus = 'all'; S.campType = 'all'; S.campQ = ''; S.campSel = new Set(); render(); };
 window.setCampOne = v => { S.campSel = new Set(v ? [v] : []); render(); };
 window.toggleCamp = id => { S.campSel.has(id) ? S.campSel.delete(id) : S.campSel.add(id); render(); };
 window.openCampaign = id => { const c = campaignById(id); S.campMarket = c?.marketId || 'all'; S.campSel = new Set([id]); if (location.hash === '#/campaigns') render(); else location.hash = '#/campaigns'; };

@@ -33,6 +33,8 @@ var PURCHASE_ACTIONS = ['purchase', 'omni_purchase', 'offsite_conversion.fb_pixe
 
 // ───────────────────────── Entry points ─────────────────────────
 function backfill() { syncAll_(180); }
+/** Run once to extend history to two years (for 6- and 12-month ranges with a comparison period). */
+function backfillTwoYears() { syncAll_(730); }
 function dailySync() { syncAll_(14); }
 
 function installDailyTrigger() {

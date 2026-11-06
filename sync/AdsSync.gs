@@ -43,6 +43,8 @@ var LEAD_CATEGORIES = ['SUBMIT_LEAD_FORM', 'CONTACT', 'PHONE_CALL_LEAD', 'IMPORT
 
 // ───────────────────────── Entry points ─────────────────────────
 function backfill() { syncAll_(180); }
+/** Run once to extend history to two years (for 6- and 12-month ranges with a comparison period). */
+function backfillTwoYears() { syncAll_(730); }
 function dailySync() { syncAll_(14); }
 
 /** Run once: schedules dailySync every day around 2am (script time zone). */
