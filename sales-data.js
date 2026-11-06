@@ -123,13 +123,14 @@ export async function loadAll(){
     getDocs(collection(db, 'mkt_mr')).catch(() => null),
   ]);
   const months = qs => { const o = {}; qs?.forEach(d => { const x = d.data(), cols = JSON.parse(x.cols || '[]'); o[x.month || d.id] = JSON.parse(x.rows || '[]').map(r => Object.fromEntries(cols.map((c, i) => [c, r[i]]))); }); return o; };
-  const sales = {};
-  snap.forEach(d => { if (/^\d{4}-\d{2}$/.test(d.id)) sales[d.id] = JSON.parse(d.data().rows); });
+  const sales = {}, salesAt = {};
+  snap.forEach(d => { if (!/^\d{4}-\d{2}$/.test(d.id)) return; const x = d.data(); sales[d.id] = JSON.parse(x.rows);
+    const t = x.syncedAt || x.uploadedAt; salesAt[d.id] = t?.toDate ? t.toDate().toISOString() : t || null; });
   const m = metaSnap?.exists() ? metaSnap.data() : null;
   const s = sumSnap?.exists() ? sumSnap.data() : null;
   const l = ltvSnap?.exists() ? ltvSnap.data() : null;
   return {
-    sales, sims: months(simSnap), mr: months(mrSnap), meta: m ? { by: m.by, at: m.at?.toDate?.() } : null,
+    sales, salesAt, sims: months(simSnap), mr: months(mrSnap), meta: m ? { by: m.by, at: m.at?.toDate?.() } : null,
     summary: s ? JSON.parse(s.months) : null,
     ltv: l ? { months: JSON.parse(l.months), rows: JSON.parse(l.rows), total: l.total ? JSON.parse(l.total) : null } : null,
   };

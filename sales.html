@@ -62,7 +62,7 @@
     <section class="panel">
       <div class="ph"><h2>Revenue, cost and gross profit</h2>
         <div class="seg" id="range" role="group" aria-label="Time range"><button data-r="12">12 mo</button><button data-r="24" aria-pressed="true">24 mo</button><button data-r="999">All</button></div></div>
-      <div class="legend"><span><i class="ln" style="background:var(--slate)"></i>Revenue (charged)</span><span><i class="ln" style="background:var(--brand)"></i>Gross profit</span><span><i class="ln" style="background:var(--fg3)"></i>Cost</span></div>
+      <div class="legend"><span><i class="ln" style="background:var(--slate)"></i>Revenue (charged)</span><span><i class="ln" style="background:var(--brand)"></i>Gross profit</span><span><i class="ln" style="background:var(--fg3)"></i>Cost</span><span id="tlegend-pj" hidden><i class="ln dash"></i>Projected (month in progress)</span></div>
       <div class="chart"><canvas id="trend" aria-label="Monthly revenue, cost and gross profit"></canvas><div class="nodata" hidden></div></div>
     </section>
     <section class="panel">
@@ -147,6 +147,17 @@ const passProd=r=>st.prod===''||(st.prod==='pkg'?!XT[r[2]]:T[r[2]]===PTYPE[st.pr
 const passX=r=>passProd(r)&&(st.type===''||T[r[2]]===st.type)&&(st.vn===''||(st.vn==='vn')===VN[r[3]]);
 const pass=r=>st.mk.has(M[r[1]])&&passX(r);
 function agg(filter){const o={subs:0,min:0,rev:0,cost:0,prev:0,xrev:0};for(const r of R)if(filter(r)){o.subs+=r[4];o.min+=r[5];o.rev+=r[6];o.cost+=r[7];if(XT[r[2]])o.xrev+=r[6];else o.prev+=r[6]}o.gp=o.rev-o.cost;return o}
+// Month in progress: scale flow figures (revenue, cost, profit, minutes) to the full month, straight-line
+// from the days covered so far (sync time of the month's data, Eastern). Subscribers are a count, not projected.
+const PJ=(()=>{const k=D[D.length-1];if(!k)return null;const[y,m]=k.split('-').map(Number);
+  const et=d=>new Date(d.toLocaleString('en-US',{timeZone:'America/New_York'}));const now=et(new Date());
+  if(now.getFullYear()!==y||now.getMonth()+1!==m)return null;
+  let a=DATA.asOf?et(new Date(DATA.asOf)):now;if(isNaN(a)||a.getFullYear()!==y||a.getMonth()+1!==m)a=now;
+  const dim=new Date(y,m,0).getDate(),el=Math.min(dim,(a-new Date(y,m-1,1))/864e5);
+  return el>=1?{i:D.length-1,f:dim/el,days:Math.floor(el),dim}:null})();
+const isPJ=i=>!!PJ&&i===PJ.i;
+const proj=o=>({...o,rev:o.rev*PJ.f,cost:o.cost*PJ.f,gp:o.gp*PJ.f,min:o.min*PJ.f,prev:o.prev*PJ.f,xrev:o.xrev*PJ.f});
+const pjNote=()=>`${PJ.days} of ${PJ.dim} days so far`;
 function byPkg(mi){const m=new Map();for(const r of R){if(r[0]!==mi||!pass(r))continue;let o=m.get(r[3]);if(!o){o={p:r[3],mk:new Set(),ty:new Set(),subs:0,min:0,rev:0,cost:0};m.set(r[3],o)}o.mk.add(r[1]);o.ty.add(r[2]);o.subs+=r[4];o.min+=r[5];o.rev+=r[6];o.cost+=r[7]}for(const o of m.values())o.gp=o.rev-o.cost;return m}
 
 // filters
@@ -179,18 +190,20 @@ function delta(cur,prev,kind){
 }
 
 function renderKpis(){
-  const a=agg(r=>r[0]===st.month&&pass(r));const b=st.cmp>=0?agg(r=>r[0]===st.cmp&&pass(r)):null;
+  const a0=agg(r=>r[0]===st.month&&pass(r)),pj=isPJ(st.month);
+  const a=pj?proj(a0):a0;let b=st.cmp>=0?agg(r=>r[0]===st.cmp&&pass(r)):null;if(b&&isPJ(st.cmp))b=proj(b);
+  const P_=l=>pj?l+' · projected':l;
   const k=[
-    ['Revenue (charged)',fm(a.rev),delta(a.rev,b&&b.rev),'lead'],
-    ['Gross profit',fm(a.gp),delta(a.gp,b&&b.gp)],
+    [P_('Revenue (charged)'),fm(a.rev),delta(a.rev,b&&b.rev),'lead',pj?`${fm(a0.rev)} to date · ${pjNote()}`:''],
+    [P_('Gross profit'),fm(a.gp),delta(a.gp,b&&b.gp),'',pj?`${fm(a0.gp)} to date`:''],
     ...(st.prod==='sim'||st.prod==='mr'?[['Margin','–','<span>no cost data yet</span>'],['Cost','–','<span>not in the Reports API</span>']]:[
     ['Margin',a.rev?fp(a.gp/a.rev):'–',delta(a.gp/a.rev,b&&b.gp/b.rev,'pt')],
-    ['Cost',fm(a.cost),delta(a.cost,b&&b.cost,'inv')]]),
+    [P_('Cost'),fm(a.cost),delta(a.cost,b&&b.cost,'inv'),'',pj?`${fm(a0.cost)} to date`:'']]),
     ['Subscribers',fn(a.subs),delta(a.subs,b&&b.subs)],
-    ['ARPU',f2(a.prev/a.subs||0),delta(a.prev/a.subs,b&&b.prev/b.subs)],
-    ['Minutes',fn(a.min),delta(a.min,b&&b.min)],
+    [P_('ARPU'),f2(a.prev/a.subs||0),delta(a.prev/a.subs,b&&b.prev/b.subs),'',pj?`${f2(a0.prev/a0.subs||0)} to date`:''],
+    [P_('Minutes'),fn(a.min),delta(a.min,b&&b.min),'',pj?`${fn(a0.min)} to date`:''],
   ];
-  $('#kpis').innerHTML=k.map(([l,v,d,c])=>`<div class="kpi ${c||''}"><span class="lbl">${l}</span><span class="v">${v}</span><span class="delta">${d}</span></div>`).join('');
+  $('#kpis').innerHTML=k.map(([l,v,d,c,n])=>`<div class="kpi ${c||''}"><span class="lbl">${l}</span><span class="v">${v}</span><span class="delta">${d}</span>${n?`<span class="pjn">${n}</span>`:''}</div>`).join('');
   $('#sub').textContent=`${ml(st.month)} · ${st.mk.size===MORDER.length?'all markets':[...st.mk].join(', ')} · ${st.prod==='sim'?'SIM activations':st.prod==='mr'?'mobile recharge':(st.prod===''?'all products · ':'')+(st.vn==='vn'?'Vnumber packages':st.vn==='non'?'non-Vnumber packages':'all packages')} · ${st.type?tsel.selectedOptions[0].text:'all package types'} · data ${ml(0)} to ${ml(D.length-1)}`;
 }
 
@@ -218,21 +231,34 @@ function renderCharts(){
   const tot=idx.map(i=>agg(r=>r[0]===i&&pass(r)));
   const selI=idx.indexOf(st.month);
   const line=(label,data,col,w=2)=>({label,data,borderColor:col,backgroundColor:col,borderWidth:w,pointRadius:0,pointHoverRadius:5,pointHoverBorderWidth:2,pointHoverBorderColor:css('--surface'),tension:.25});
-  const tds=[line('Revenue',tot.map(t=>t.rev),css('--slate')),line('Gross profit',tot.map(t=>t.gp),css('--brand'),2.5),line('Cost',tot.map(t=>t.cost),css('--fg3'))];
+  // Month in progress: the solid lines stop at the last full month; a dashed segment runs to the projection.
+  const pi=PJ?idx.indexOf(PJ.i):-1;
+  const act=k=>tot.map((t,j)=>j===pi?null:t[k]);
+  const tds=[line('Revenue',act('rev'),css('--slate')),line('Gross profit',act('gp'),css('--brand'),2.5),line('Cost',act('cost'),css('--fg3'))];
   tds[1].fill={target:'origin'};tds[1].backgroundColor=css('--brand-soft');
+  if(pi>0){[['rev','Revenue',css('--slate')],['gp','Gross profit',css('--brand')],['cost','Cost',css('--fg3')]].forEach(([k,l,c])=>{
+    const p=proj(tot[pi]);const d=tot.map((t,j)=>j===pi-1?t[k]:j===pi?p[k]:null);
+    tds.push({...line(l+' (projected)',d,c),borderDash:[6,4],pointRadius:d.map((_,j)=>j===pi?3:0),_pj:true})})}
   setNoData('trend',tot.every(x=>!x.rev&&!x.subs&&!x.cost),`No data for ${selText()} in this period.`);
   const o1=baseOpts((v,ax)=>ax?fk(v):fm(v));o1.plugins.selBand={idx:selI};
+  o1.plugins.tooltip.filter=it=>it.parsed.y!=null&&!(it.dataset._pj&&it.dataIndex!==pi);
+  if(pi>0)o1.plugins.tooltip.callbacks.afterBody=it=>it[0]&&it[0].dataIndex===pi?['','To date ('+pjNote()+'):',' Revenue: '+fm(tot[pi].rev),' Gross profit: '+fm(tot[pi].gp),' Cost: '+fm(tot[pi].cost)]:[];
   trendC=mkChart(trendC,'trend',{type:'line',data:{labels,datasets:tds},options:o1,plugins:[selBand]});
 
   const key=st.metric;const fmtM=key==='subs'?(v=>fn(v)):(v,ax)=>ax?fk(v):fm(v);
   const mk=MORDER.filter(m=>st.mk.has(m));
   const mds=mk.map(m=>{const mi=M.indexOf(m);return{label:m,data:idx.map(i=>{const a=agg(r=>r[0]===i&&r[1]===mi&&passX(r));return a[key]}),backgroundColor:mcol(m),borderColor:css('--surface'),borderWidth:{top:2,bottom:0,left:0,right:0},borderRadius:0,borderSkipped:false,maxBarThickness:28}});
   setNoData('bymarket',mds.every(d=>d.data.every(v=>!v)),`No data for ${selText()} in this period.`);
+  // Month in progress: a lighter block on top of each market's bar = the projected rest of the month.
+  const qi=PJ&&key!=='subs'?idx.indexOf(PJ.i):-1;
+  if(qi>=0)mk.forEach((m,j)=>{const v=mds[j].data[qi]*(PJ.f-1);mds.push({...mds[j],label:m+' (projected rest of month)',data:idx.map((_,x)=>x===qi?v:0),backgroundColor:mcol(m)+'55',_pj:true})});
   const o2=baseOpts(fmtM);o2.scales.x.stacked=true;o2.scales.y.stacked=true;o2.plugins.selBand={idx:selI};
-  o2.plugins.tooltip.callbacks.footer=items=>'Total: '+fmtM(items.reduce((s,i)=>s+i.parsed.y,0));
+  o2.plugins.tooltip.filter=it=>!(it.dataset._pj&&it.dataIndex!==qi);
+  o2.plugins.tooltip.callbacks.footer=items=>{const t=items.reduce((s,i)=>s+i.parsed.y,0);if(!items[0]||items[0].dataIndex!==qi)return 'Total: '+fmtM(t);const a=items.filter(i=>!i.dataset._pj).reduce((s,i)=>s+i.parsed.y,0);return ['To date: '+fmtM(a)+' ('+pjNote()+')','Projected month: '+fmtM(t)]};
   o2.plugins.tooltip.footerColor=css('--fg');
   mktC=mkChart(mktC,'bymarket',{type:'bar',data:{labels,datasets:mds},options:o2,plugins:[selBand]});
-  $('#mlegend').innerHTML=mk.map(m=>`<span><i style="background:${mcol(m)}"></i>${m}</span>`).join('');
+  $('#mlegend').innerHTML=mk.map(m=>`<span><i style="background:${mcol(m)}"></i>${m}</span>`).join('')+(qi>=0?`<span><i style="background:${css('--fg3')}55"></i>Projected rest of ${mls(PJ.i)}</span>`:'');
+  $('#tlegend-pj').hidden=!(PJ&&idx.indexOf(PJ.i)>0);
 }
 
 function renderSubs(){
@@ -381,7 +407,7 @@ initPage({
   title: 'Sales',
   emptyText: 'No sales report has been uploaded yet. Upload the monthly Package Profitability workbook (.xlsx) to fill this page. A file with the full history fills every month; a file with one month adds or replaces just that month.',
   ready: d => Object.keys(d.sales || {}).length > 0,
-  render: d => window.startDashboard(toDATA(withProducts(d))),
+  render: d => { const D = toDATA(withProducts(d)); D.asOf = d.salesAt?.[D.d[D.d.length - 1]] || null; window.startDashboard(D); },
 });
 </script>
 </body>
