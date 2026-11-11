@@ -66,7 +66,7 @@ initReport({
   // (Not Active, Pre-Suspended, Suspended).
   derive: r => { r.line = /vnumber/i.test(String(r.plan || '')) ? 'VNUMBER' : 'Non-VNUMBER';
     r.group = /^(active|sleeping)$/i.test(String(r.status || '').trim()) ? 'Active' : 'Not active'; },
-  stack: { key: 'group', series: [{ v: 'Active', label: 'Active (Active + Sleeping)', color: '#1E7F4F' }, { v: 'Not active', label: 'Not active (Not Active + Pre-Suspended + Suspended)', color: '#B42318' }] },
+  stack: { key: 'group', series: [{ v: 'Active', label: 'Active (Active + Sleeping)', color: '#3A6EA5' }, { v: 'Not active', label: 'Not active (Not Active + Pre-Suspended + Suspended)', color: '#EE7805' }] },
   dims: [{ key: 'line', label: 'VNUMBER / Non-VNUMBER', filter: true }, { key: 'group', label: 'Status group', filter: true }, { key: 'plan', label: 'Plan', filter: true }, { key: 'agent', label: 'Agent', filter: true }, { key: 'creator', label: 'Creator', filter: true },
          { key: 'status', label: 'Status', filter: true }, { key: 'autoTopup', label: 'Auto top-up' }],
   measures: [{ key: 'count', label: 'New subscribers', fmt: 'int' }, { key: 'credit', label: 'Credit balance', fmt: 'usd' }],
