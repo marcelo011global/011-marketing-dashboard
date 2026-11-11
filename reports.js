@@ -6,7 +6,8 @@
 //   dims        [{key, label, filter?}]   breakdowns (tables) and, with filter:true, filter dropdowns
 //   measures    [{key, label, fmt:'int'|'usd'}]  the first one leads (charts, shares, sorting)
 //   stack       optional {key, series:[{v, label, color}]}: split the trend bars into colored parts
-//   derive      optional fn(row) that adds computed fields (e.g. country from the plan name) before anything is drawn
+//   packageTypes optional true: also load mkt_sales (package report) and pass derive a ctx {pkgType: Map package → 'Monthly'|'Prepaid'}
+//   derive      optional fn(row, ctx) that adds computed fields (e.g. country from the plan name) before anything is drawn
 // Layout: filters → KPI strip → trend chart → one ranked table per breakdown.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -51,6 +52,19 @@ async function load(coll){
   return { months, synced };
 }
 
+// Package name → Monthly / Prepaid, from the package report (mkt_sales rows [market, type, package, …]).
+// Renewal* types count as Monthly; the latest month wins when a package changes type.
+function pkgTypes(months){
+  const m = new Map();
+  Object.keys(months || {}).sort().forEach(k => (months[k] || []).forEach(r => { const t = /^renewal/i.test(r[1]) ? 'Monthly' : r[1]; if (t === 'Monthly' || t === 'Prepaid') m.set(String(r[2]).trim(), t); }));
+  return m;
+}
+async function loadPkgTypes(){
+  const snap = await getDocs(collection(db, 'mkt_sales')), months = {};
+  snap.forEach(d => { if (/^\d{4}-\d{2}$/.test(d.id)) months[d.id] = JSON.parse(d.data().rows || '[]'); });
+  return pkgTypes(months);
+}
+
 // Local-only preview (?preview on localhost): no sign-in; reads a gitignored
 // preview-data/<coll>.json holding {months: {YYYY-MM: [row objects]}}.
 const LOCAL_PREVIEW = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('preview');
@@ -61,7 +75,8 @@ export function initReport(cfg){
   $('signout').onclick = async () => { await signOut(auth); location.href = 'index.html'; };
   if (LOCAL_PREVIEW) {
     $('user-display').textContent = 'Local preview';
-    fetch(`preview-data/${cfg.coll}.json`).then(r => r.json()).then(d => { $('gate').hidden = true; $('app').hidden = false; start(cfg, d); });
+    Promise.all([fetch(`preview-data/${cfg.coll}.json`).then(r => r.json()), cfg.packageTypes ? fetch('preview-data/mkt_sales.json').then(r => r.json()).catch(() => null) : null])
+      .then(([d, s]) => { $('gate').hidden = true; $('app').hidden = false; start(cfg, d, { pkgType: pkgTypes(s?.months) }); });
     return;
   }
   onAuthStateChanged(auth, async user => {
@@ -72,10 +87,10 @@ export function initReport(cfg){
     $('user-display').textContent = user.displayName || user.email;
     gate('<p>Loading…</p>');
     try {
-      const data = await load(cfg.coll);
+      const [data, pkgType] = await Promise.all([load(cfg.coll), cfg.packageTypes ? loadPkgTypes().catch(e => { console.error(e); return new Map(); }) : null]);
       if (!Object.keys(data.months).length) { gate(`<h1>${esc(cfg.title)}</h1><p>No data yet. It arrives from the nightly Reports API sync.</p>`); return; }
       $('gate').hidden = true; $('app').hidden = false;
-      start(cfg, data);
+      start(cfg, data, { pkgType: pkgType || new Map() });
     } catch (e) {
       console.error(e);
       gate(`<h1>${esc(cfg.title)} could not load</h1><p>${/permission|insufficient/i.test(e.message || '') ? `Firestore refused access. The security rules need to allow signed-in staff to read the ${esc(cfg.coll)} collection.` : 'Something went wrong while loading. Reload the page to try again.'}</p>`);
@@ -83,8 +98,8 @@ export function initReport(cfg){
   });
 }
 
-function start(cfg, data){
-  if (cfg.derive) Object.values(data.months).forEach(rows => rows.forEach(cfg.derive));
+function start(cfg, data, ctx = {}){
+  if (cfg.derive) Object.values(data.months).forEach(rows => rows.forEach(r => cfg.derive(r, ctx)));
   const keys = Object.keys(data.months).sort();
   const lead = cfg.measures[0];
   const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], f: {}, open: {}, view: cfg.view || 'monthly' };
