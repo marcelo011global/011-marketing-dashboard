@@ -19,7 +19,7 @@
  * numbers, customer IDs or other personal fields are stored:
  *   mkt_sales/{YYYY-MM}   packages-profitability, same rows as the Sales page's xlsx
  *                         upload: [market, type, package, subscribers, minutes, charged, cost, didCost]
- *   mkt_vnEnroll/{YYYY-MM} VNUMBER enrollments, counted by day × DID country × origin country ×
+ *   mkt_vnEnroll/{YYYY-MM} VNUMBER enrollments (incl. term = months interval), counted by day × DID country × origin country ×
  *                         package × creator × status × language × promo code
  *   mkt_subs/{YYYY-MM}    new subscribers, counted by day × plan × agent × creator × status × auto top-up
  *   mkt_mr/{YYYY-MM}      mobile-recharge revenue by day × market × rep (already aggregated by the API)
@@ -89,10 +89,10 @@ function syncMonth_(p) {
 
   var en = data_('vnumber-enrollments', { year: p.y, month: p.m });
   put('mkt_vnEnroll',
-    ['day', 'didCountry', 'originCountry', 'package', 'creator', 'status', 'language', 'promo',
+    ['day', 'didCountry', 'originCountry', 'package', 'creator', 'status', 'language', 'promo', 'term',
      'count', 'amount', 'credit', 'closed', 'inMin', 'outMin', 'inSms', 'outSms'],
     cube_(en, function (r) {
-      return [day_(r.creationDate), r.dIDCountry, r.originCountry, r.package, r.creator, r.status, r.language, r.promo_code || ''];
+      return [day_(r.creationDate), r.dIDCountry, r.originCountry, r.package, r.creator, r.status, r.language, r.promo_code || '', term_(r)];
     }, function (r) {
       return [1, +r.amount || 0, +r.credit || 0, r.closerDate ? 1 : 0, +r.incomingMinutes || 0, +r.outgoingMinutes || 0,
               +r.incomingSms || 0, +r.outgoingSms || 0];
@@ -119,6 +119,14 @@ function syncMonth_(p) {
 }
 
 // Groups rows by the dimension tuple and sums the measures; returns [...dims, ...measures] rows.
+// Months bought up front on a VNUMBER enrollment (the report's "months interval" column): 1, 3, 12… ('' if absent).
+var TERM_KEY_RE = /month.*interval|interval.*month/i;
+function term_(r) {
+  var k = Object.keys(r).filter(function (f) { return TERM_KEY_RE.test(f); })[0];
+  var n = k ? parseInt(r[k], 10) : NaN;
+  return n > 0 ? n : '';
+}
+
 function cube_(rows, dims, measures) {
   var map = {}, order = [];
   rows.forEach(function (r) {
