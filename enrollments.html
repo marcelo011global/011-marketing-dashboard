@@ -63,8 +63,11 @@
 import { initReport } from './reports.js?v=202611111615';
 initReport({
   title: 'VNUMBER enrollments', coll: 'mkt_vnEnroll',
+  // Same status groups and colors as the Subscribers page: Active = Active + Sleeping; Not active = everything else.
+  derive: r => { r.group = /^(active|sleeping)$/i.test(String(r.status || '').trim()) ? 'Active' : 'Not active'; },
+  stack: { key: 'group', series: [{ v: 'Active', label: 'Active (Active + Sleeping)', color: '#3A6EA5' }, { v: 'Not active', label: 'Not active (Not Active + Pre-Suspended + Suspended)', color: '#EE7805' }] },
   dims: [{ key: 'didCountry', label: 'Number country', filter: true }, { key: 'originCountry', label: 'Customer country', filter: true },
-         { key: 'package', label: 'Plan', filter: true }, { key: 'creator', label: 'Creator', filter: true }, { key: 'status', label: 'Status', filter: true },
+         { key: 'package', label: 'Plan', filter: true }, { key: 'creator', label: 'Creator', filter: true }, { key: 'group', label: 'Status group' }, { key: 'status', label: 'Status', filter: true },
          { key: 'language', label: 'Language' }, { key: 'promo', label: 'Promo code' }],
   measures: [{ key: 'count', label: 'Enrollments', fmt: 'int' }, { key: 'amount', label: 'Initial charges', fmt: 'usd' }],
   kpis: (cur, prev, sum) => {
