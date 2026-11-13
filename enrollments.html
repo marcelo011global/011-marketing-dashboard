@@ -71,9 +71,9 @@ initReport({
          { key: 'language', label: 'Language' }, { key: 'promo', label: 'Promo code' }],
   measures: [{ key: 'count', label: 'Enrollments', fmt: 'int' }, { key: 'amount', label: 'Initial charges', fmt: 'usd' }],
   kpis: (cur, prev, sum) => {
-    const n = sum(cur, 'count'), act = sum(cur.filter(r => r.status === 'Active'), 'count'), web = sum(cur.filter(r => r.creator === 'mobile_site'), 'count');
+    const n = sum(cur, 'count'), act = sum(cur.filter(r => r.group === 'Active'), 'count'), web = sum(cur.filter(r => r.creator === 'mobile_site'), 'count');
     return [{ label: 'Avg initial charge', value: n ? '$' + (sum(cur, 'amount') / n).toFixed(2) : '—' },
-            { label: 'Still active', value: n ? (act / n * 100).toFixed(1) + '%' : '—' },
+            { label: 'Still active', value: n ? (act / n * 100).toFixed(1) + '%' : '—', note: act.toLocaleString('en-US') + ' incl. sleeping' },
             { label: 'Self-serve (site/app)', value: n ? (web / n * 100).toFixed(1) + '%' : '—' }];
   },
 });

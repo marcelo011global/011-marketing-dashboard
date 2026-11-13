@@ -74,9 +74,9 @@ initReport({
          { key: 'status', label: 'Status', filter: true }, { key: 'autoTopup', label: 'Auto top-up' }],
   measures: [{ key: 'count', label: 'New subscribers', fmt: 'int' }, { key: 'credit', label: 'Credit balance', fmt: 'usd' }],
   kpis: (cur, prev, sum) => {
-    const n = sum(cur, 'count'), act = sum(cur.filter(r => r.status === 'Active'), 'count'), sl = sum(cur.filter(r => r.status === 'Sleeping'), 'count');
-    return [{ label: 'Still active', value: n ? (act / n * 100).toFixed(1) + '%' : '—', note: act.toLocaleString('en-US') + ' of them' },
-            { label: 'Sleeping', value: n ? (sl / n * 100).toFixed(1) + '%' : '—', note: sl.toLocaleString('en-US') + ' of them' }];
+    const n = sum(cur, 'count'), act = sum(cur.filter(r => r.group === 'Active'), 'count'), sl = sum(cur.filter(r => r.status === 'Sleeping'), 'count');
+    return [{ label: 'Still active', value: n ? (act / n * 100).toFixed(1) + '%' : '—', note: act.toLocaleString('en-US') + ' incl. sleeping' },
+            { label: 'Of which sleeping', value: n ? (sl / n * 100).toFixed(1) + '%' : '—', note: sl.toLocaleString('en-US') + ' of them' }];
   },
 });
 </script>
