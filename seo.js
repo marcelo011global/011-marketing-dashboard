@@ -150,7 +150,7 @@ const isLpHost = u => { try { return /^lp[.-]/i.test(new URL(u).host); } catch {
 function pageType(url){
   let p; try { p = new URL(url).pathname.toLowerCase(); } catch { p = String(url).toLowerCase(); }
   if (/^\/([a-z]{2}(-[a-z]{2})?\/?)?$/.test(p)) return 'Home';
-  if (/\/(blog|news|articles?|posts?|guides?)(\/|$)/.test(p)) return 'Blog';
+  if (/\/(blogs?|news|articles?|posts?|guides?)(\/|$)/.test(p)) return 'Blog';   // VNumber uses /blogs/
   if (/\/(lp|landing|go|promo|offers?)(\/|$)/.test(p) || isLpHost(url)) return 'Landing';
   return 'Site page';
 }
@@ -171,10 +171,12 @@ function start(data, getPaid){
   $('filters').innerHTML =
     `<div class="f"><label for="from">From</label><select id="from">${keys.map(k => opt(k, monthName(k), k === st.from)).join('')}</select></div>
      <div class="f"><label for="to">To</label><select id="to">${keys.map(k => opt(k, monthName(k) + (k === today ? ' (so far)' : ''), k === st.to)).join('')}</select></div>
-     <div class="f"><label for="site">Site</label><select id="site">${opt('', 'All sites', true)}${SITES.map(s => opt(s.k, s.k)).join('')}</select></div>`;
+     <div class="f"><span class="lbl">Site</span><div class="seg" role="group" id="site">${[['', 'All sites'], ...SITES.map(s => [s.k, s.k])].map(([v, l]) => `<button type="button" data-site="${esc(v)}" aria-pressed="${st.site === v}">${esc(l)}</button>`).join('')}</div></div>`;
   $('from').onchange = e => { st.from = e.target.value; if (st.from > st.to) { st.to = st.from; $('to').value = st.to; } render(); };
   $('to').onchange = e => { st.to = e.target.value; if (st.to < st.from) { st.from = st.to; $('from').value = st.from; } render(); };
-  $('site').onchange = e => { st.site = e.target.value; render(); };
+  $('site').querySelectorAll('button').forEach(b => b.onclick = () => {
+    st.site = b.dataset.site; $('site').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); render();
+  });
   window.addEventListener('hashchange', () => render());
 
   const charts = [];
