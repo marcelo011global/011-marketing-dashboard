@@ -205,7 +205,8 @@ function start(data, getPaid){
       { l: 'CTR', v: P(ctr(tc)), d: delta(ctr(tc), ctr(tp)) },
       { l: 'Avg position', v: POS(pos(tc)), d: deltaPos(pos(tc), pos(tp)) },
       { l: 'Organic sessions (GA4)', v: N(org(C.ga4)), d: delta(org(C.ga4), org(Pv.ga4)) },
-      { l: 'Organic key events', v: N(orgK(C.ga4)), d: delta(orgK(C.ga4), orgK(Pv.ga4)) },
+      { l: 'Organic conversions', v: N(orgK(C.ga4)), d: delta(orgK(C.ga4), orgK(Pv.ga4)) },
+      { l: 'Organic conv. rate', v: P(orgK(C.ga4) / org(C.ga4)), d: delta(orgK(C.ga4) / org(C.ga4), orgK(Pv.ga4) / org(Pv.ga4)) },
       { l: 'AI assistant visits', v: N(sum(C.ai, 'sessions')), d: delta(sum(C.ai, 'sessions'), sum(Pv.ai, 'sessions')) },
     ];
     $('kpis').innerHTML = kpis.map(k => `<div class="kpi${k.lead ? ' lead' : ''}"><span class="lbl">${esc(k.l)}</span><span class="v">${k.v}</span>${hasPrev ? k.d : ''}</div>`).join('');
@@ -254,9 +255,12 @@ function start(data, getPaid){
   // ── Overview ──
   function overview(ctx){
     const { C, Pv, hasPrev, inRange } = ctx;
-    const days = [...new Set(C.daily.map(r => r.day))].sort();
+    // Conversions = GA4 key events from Organic Search sessions; clicks / impressions = Search Console.
+    const conv = st.metric === 'conversions';
+    const src = conv ? C.ga4.filter(r => r.channel === 'Organic Search') : C.daily, fld = conv ? 'keyEvents' : st.metric;
+    const days = [...new Set(src.map(r => r.day))].sort();
     const sites = st.site ? [st.site] : SITES.map(s => s.k);
-    const by = {}; C.daily.forEach(r => { const k = r.site + '|' + r.day; by[k] = (by[k] || 0) + (+r[st.metric] || 0); });
+    const by = {}; src.forEach(r => { const k = r.site + '|' + r.day; by[k] = (by[k] || 0) + (+r[fld] || 0); });
     ctx.after = [lineChart('trend', days.map(d => dayLabel(d, inRange.length > 1)), sites.map(s => ({ label: s, data: days.map(d => by[s + '|' + d] || 0), borderColor: SCOLOR[s], backgroundColor: SCOLOR[s] })))];
 
     const sc = gscAgg(C.daily, r => r.site), sp = gscAgg(Pv.daily, r => r.site);
@@ -265,7 +269,8 @@ function start(data, getPaid){
     const siteTbl = table('sites', 'By site', 'Search Console + GA4 organic', [
       { l: 'Site', f: a => siteDot(a.k) + esc(a.k), t: a => a.k }, ...gscCols(hasPrev, sp),
       { l: 'Organic sessions', f: a => N(ga(C.ga4, a.k, 'Organic Search', 'sessions')) },
-      { l: 'Key events', f: a => N(ga(C.ga4, a.k, 'Organic Search', 'keyEvents')) },
+      { l: 'Conversions', f: a => N(ga(C.ga4, a.k, 'Organic Search', 'keyEvents')) },
+      { l: 'Conv. rate', f: a => P(ga(C.ga4, a.k, 'Organic Search', 'keyEvents') / ga(C.ga4, a.k, 'Organic Search', 'sessions')) },
     ], siteList);
 
     const chAgg = rows => { const m = new Map(); rows.forEach(r => { const a = m.get(r.channel) || { k: r.channel, sessions: 0, engaged: 0, keyEvents: 0 }; a.sessions += +r.sessions || 0; a.engaged += +r.engaged || 0; a.keyEvents += +r.keyEvents || 0; m.set(r.channel, a); }); return m; };
@@ -279,7 +284,7 @@ function start(data, getPaid){
 
     const typeAgg = gscAgg(C.pages, r => pageType(r.page)), typeAll = tot(C.pages);
     const types = `<section class="panel"><div class="ph"><h2>Clicks by page type</h2><p class="note">Which kinds of pages bring organic traffic</p></div><div class="sstats">${['Home', 'Landing', 'Blog', 'Site page'].map(t => { const a = typeAgg.get(t) || { clicks: 0 }; return `<div class="stat"><span class="lbl">${t === 'Site page' ? 'Other pages' : t}</span><b>${N(a.clicks)}</b><span class="note">${P(a.clicks / typeAll.clicks)} of clicks</span></div>`; }).join('')}</div></section>`;
-    return `<section class="panel"><div class="ph"><h2>${st.metric === 'clicks' ? 'Clicks from Google' : 'Impressions in Google results'} per day</h2><div class="tools">${seg('metric', [['clicks', 'Clicks'], ['impressions', 'Impressions']])}<p class="note">Search Console · data lags about 2 days</p></div></div><div class="chart"><canvas id="trend"></canvas></div></section>${types}
+    return `<section class="panel"><div class="ph"><h2>${({ clicks: 'Clicks from Google', impressions: 'Impressions in Google results', conversions: 'Conversions from organic search' })[st.metric]} per day</h2><div class="tools">${seg('metric', [['clicks', 'Clicks'], ['impressions', 'Impressions'], ['conversions', 'Conversions']])}<p class="note">${conv ? 'GA4 key events from Organic Search sessions · lags about 1 day' : 'Search Console · data lags about 2 days'}</p></div></div><div class="chart"><canvas id="trend"></canvas></div></section>${types}
       ${siteTbl}${chTbl}`;
   }
 
