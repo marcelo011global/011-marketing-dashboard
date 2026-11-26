@@ -10,6 +10,8 @@
 //   mkt_seoGa4      [day, site, channel, sessions, engaged, keyEvents]  GA4 sessions by channel group
 //   mkt_seoAi       [site, source, host, page, sessions, engaged, keyEvents]  visits from AI assistants
 //   mkt_seoLanding  [site, host, page, channel, sessions, engaged, keyEvents]  GA4 landing pages, all channels
+//   mkt_seoDailyType [day, site, type, clicks, impressions, posw] · mkt_seoGa4Type [day, site, type, sessions, engaged, keyEvents]
+//                   per page type (Home / Blog / Landing / Site page) — the Overview "Pages" filter swaps these in
 //   mkt_seoBingDaily [day, site, clicks, impressions] · mkt_seoBingQueries / mkt_seoBingPages [site, query|page, clicks, impressions, posw]
 //                   Bing Webmaster Tools (bingSync in SeoSync.gs; ~6 months of history)
 // posw = average position × impressions, so positions can be summed and re-averaged.
@@ -34,7 +36,7 @@ const auth = getAuth(app), db = getFirestore(app);
 const ALLOWED = ['@011global.com','@011telecom.com'];
 const allowedEmail = e => ALLOWED.some(d => (e || '').toLowerCase().endsWith(d));
 
-const COLLS = { daily: 'mkt_seoDaily', pages: 'mkt_seoPages', queries: 'mkt_seoQueries', markets: 'mkt_seoMarkets', pageCountry: 'mkt_seoPageCountry', ga4: 'mkt_seoGa4', ai: 'mkt_seoAi', landing: 'mkt_seoLanding',
+const COLLS = { daily: 'mkt_seoDaily', pages: 'mkt_seoPages', queries: 'mkt_seoQueries', markets: 'mkt_seoMarkets', pageCountry: 'mkt_seoPageCountry', ga4: 'mkt_seoGa4', ai: 'mkt_seoAi', landing: 'mkt_seoLanding', dailyType: 'mkt_seoDailyType', ga4Type: 'mkt_seoGa4Type',
   bingDaily: 'mkt_seoBingDaily', bingQueries: 'mkt_seoBingQueries', bingPages: 'mkt_seoBingPages' };
 const LATEST = { audit: 'mkt_seoAudit', speed: 'mkt_seoSpeed' };
 const SITES = [{ k: 'VNumber', c: '#EE7805' }, { k: '011 Global', c: '#3A6EA5' }, { k: 'GlobuSIM', c: '#6B8E23' }];
@@ -163,7 +165,7 @@ function start(data, getPaid){
   const keys = [...new Set(Object.values(data).flatMap(d => Object.keys(d.months || {})))].sort();
   if (!keys.length) { $('app').innerHTML = '<p class="empty">No data yet.</p>'; return; }
   const today = new Date().toISOString().slice(0, 7);
-  const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], site: '', ptype: '', brand: 'nonbrand', q: { pages: '', queries: '' }, open: {}, metric: 'clicks', strategy: 'mobile', lpOnly: 'yes', paid: null, paidErr: '', country: '' };
+  const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], site: '', ptype: '', brand: 'nonbrand', q: { pages: '', queries: '' }, open: {}, metric: 'clicks', strategy: 'mobile', lpOnly: 'yes', paid: null, paidErr: '', country: '', otype: '' };
   if (st.to === today && keys.length > 1) st.from = st.to = keys[keys.length - 2];   // default: last full month
   const synced = Object.values(data).map(d => d.synced).filter(Boolean).sort().pop();
   $('srcnote').textContent = synced ? 'Synced ' + new Date(synced).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' from Search Console and GA4' : '';
@@ -194,10 +196,17 @@ function start(data, getPaid){
     const rowsOf = (name, ks) => ks.flatMap(k => (data[name].months[k] || [])).filter(passSite);
     const C = {}, Pv = {};
     Object.keys(COLLS).forEach(name => { C[name] = rowsOf(name, inRange); Pv[name] = rowsOf(name, prevKeys); });
+    // Overview "Pages" filter: swap in the per-page-type series so the KPIs, chart and site table all follow it.
+    const hasType = Object.keys(data.dailyType?.months || {}).length > 0, ftype = v === 'overview' && st.otype && hasType ? st.otype : '';
+    if (ftype) [C, Pv].forEach(X => {
+      X.daily = X.dailyType.filter(r => r.type === ftype);
+      X.ga4 = X.ga4Type.filter(r => r.type === ftype).map(r => ({ ...r, channel: 'Organic Search' }));
+      X.ai = X.ai.filter(r => pageType('https://' + r.host + r.page) === ftype);
+    });
     const hasPrev = prevKeys.length > 0;
     const period = n === 1 ? monthName(st.from) : monthName(st.from) + ' – ' + monthName(st.to);
     const prevLabel = hasPrev ? (prevKeys.length === 1 ? monthName(prevKeys[0]) : monthName(prevKeys[0]) + ' – ' + monthName(prevKeys[prevKeys.length - 1])) : '';
-    $('sub').textContent = (st.site || 'All sites') + ' · ' + period + (inRange.includes(today) ? ' (so far)' : '') + (prevLabel ? ' · compared with ' + prevLabel : '');
+    $('sub').textContent = (st.site || 'All sites') + (ftype ? ' · ' + (ftype === 'Site page' ? 'Other pages' : ftype + ' pages') : '') + ' · ' + period + (inRange.includes(today) ? ' (so far)' : '') + (prevLabel ? ' · compared with ' + prevLabel : '');
 
     // KPI strip (every view)
     const tc = tot(C.daily), tp = tot(Pv.daily);
@@ -215,7 +224,7 @@ function start(data, getPaid){
     ];
     $('kpis').innerHTML = kpis.map(k => `<div class="kpi${k.lead ? ' lead' : ''}"><span class="lbl">${esc(k.l)}</span><span class="v">${k.v}</span>${hasPrev ? k.d : ''}</div>`).join('');
 
-    const ctx = { C, Pv, hasPrev, inRange, prevKeys };
+    const ctx = { C, Pv, hasPrev, inRange, prevKeys, hasType, ftype };
     const al = alertList(ctx), high = al.filter(a => a.sev === 'High').length;
     const at = $('views').querySelector('[data-v="alerts"]'); at.innerHTML = 'Alerts' + (al.length ? ` <span class="pill ${high ? 'p-loss' : 'p-low'}">${al.length}</span>` : '');
     ctx.alerts = al;
@@ -292,8 +301,9 @@ function start(data, getPaid){
 
     const typeAgg = gscAgg(C.pages, r => pageType(r.page)), typeAll = tot(C.pages);
     const types = `<section class="panel"><div class="ph"><h2>Clicks by page type</h2><p class="note">Which kinds of pages bring organic traffic</p></div><div class="sstats">${['Home', 'Landing', 'Blog', 'Site page'].map(t => { const a = typeAgg.get(t) || { clicks: 0 }; return `<div class="stat"><span class="lbl">${t === 'Site page' ? 'Other pages' : t}</span><b>${N(a.clicks)}</b><span class="note">${P(a.clicks / typeAll.clicks)} of clicks</span></div>`; }).join('')}</div></section>`;
-    return `<section class="panel"><div class="ph"><h2>${({ clicks: 'Clicks from Google', impressions: 'Impressions in Google results', conversions: 'Conversions from organic search' })[st.metric]} per day</h2><div class="tools">${seg('metric', [['clicks', 'Clicks'], ['impressions', 'Impressions'], ['conversions', 'Conversions']])}<p class="note">${conv ? 'GA4 key events from Organic Search sessions · lags about 1 day' : 'Search Console · data lags about 2 days'}</p></div></div><div class="chart"><canvas id="trend"></canvas></div></section>${types}
-      ${siteTbl}${chTbl}`;
+    const pf = `<div class="tools ofilter"><span class="lbl">Pages</span>${seg('otype', [['', 'All pages'], ['Home', 'Home'], ['Blog', 'Blog'], ['Landing', 'Landing'], ['Site page', 'Other']])}${!ctx.hasType ? '<p class="note">Page-type figures appear after the next SEO Sync backfill()</p>' : ctx.ftype ? '<p class="note">Organic figures for these pages only · GA4 by landing page</p>' : ''}</div>`;
+    return pf + `<section class="panel"><div class="ph"><h2>${({ clicks: 'Clicks from Google', impressions: 'Impressions in Google results', conversions: 'Conversions from organic search' })[st.metric]} per day</h2><div class="tools">${seg('metric', [['clicks', 'Clicks'], ['impressions', 'Impressions'], ['conversions', 'Conversions']])}<p class="note">${conv ? 'GA4 key events from Organic Search sessions · lags about 1 day' : 'Search Console · data lags about 2 days'}</p></div></div><div class="chart"><canvas id="trend"></canvas></div></section>${types}
+      ${siteTbl}${ctx.ftype ? '' : chTbl}`;
   }
 
   // ── Pages ──

@@ -15,6 +15,9 @@
  *   mkt_seoMarkets/{YYYY-MM}  [site, country, device, clicks, impressions, posw]
  *   mkt_seoPageCountry/{YYYY-MM} [site, country, page, clicks, impressions, posw]  top PER_COUNTRY pages per country per site
  *   mkt_seoGa4/{YYYY-MM}      [day, site, channel, sessions, engaged, keyEvents]
+ *   mkt_seoDailyType/{YYYY-MM} [day, site, type, clicks, impressions, posw]      Search Console per day per page type
+ *   mkt_seoGa4Type/{YYYY-MM}   [day, site, type, sessions, engaged, keyEvents]   GA4 Organic Search per day per landing-page type
+ *                             type = Home / Blog / Landing / Site page (pageType_, same rules as seo.js)
  *   mkt_seoAi/{YYYY-MM}       [site, source, host, page, sessions, engaged, keyEvents]
  *                             sessions from AI assistants (GA4 channel "AI Assistant" or a known AI source)
  *   mkt_seoLanding/{YYYY-MM}  [site, host, page, channel, sessions, engaged, keyEvents]  GA4 landing pages, all channels
@@ -124,7 +127,7 @@ function monthsBack_(n) {
 // All sites are read first; if any call fails nothing is written for that month, so
 // a doc never loses one site's rows because of a passing error.
 function syncMonth_(p) {
-  var out = { daily: [], pages: [], queries: [], markets: [], pageCountry: [], ga4: [], ai: [], landing: [] };
+  var out = { daily: [], pages: [], queries: [], markets: [], pageCountry: [], dailyType: [], ga4: [], ga4Type: [], ai: [], landing: [] };
   SEO.SITES.forEach(function (s) {
     var gq = function (dims) { return gsc_(s.gsc, { startDate: p.from, endDate: p.to, dimensions: dims, type: 'web', dataState: 'all' }); };
     var row = function (r) { return [r.clicks || 0, r.impressions || 0, round2_((r.position || 0) * (r.impressions || 0))]; };
@@ -133,11 +136,28 @@ function syncMonth_(p) {
     top_(gq(['page'])).forEach(function (r) { out.pages.push([s.name, r.keys[0]].concat(row(r))); });
     top_(gq(['query'])).forEach(function (r) { out.queries.push([s.name, r.keys[0]].concat(row(r))); });
     gq(['country', 'device']).forEach(function (r) { out.markets.push([s.name, r.keys[0], r.keys[1]].concat(row(r))); });
+    var dt = {};
+    gq(['date', 'page']).forEach(function (r) {
+      var k = r.keys[0] + '|' + pageType_(r.keys[1]), a = dt[k] || (dt[k] = [r.keys[0], s.name, pageType_(r.keys[1]), 0, 0, 0]);
+      a[3] += r.clicks || 0; a[4] += r.impressions || 0; a[5] += (r.position || 0) * (r.impressions || 0);
+    });
+    Object.keys(dt).forEach(function (k) { dt[k][5] = round2_(dt[k][5]); out.dailyType.push(dt[k]); });
     perGroup_(gq(['country', 'page']), SEO.PER_COUNTRY).forEach(function (r) { out.pageCountry.push([s.name, r.keys[0], r.keys[1]].concat(row(r))); });
 
     var metrics = [{ name: 'sessions' }, { name: 'engagedSessions' }, { name: 'keyEvents' }];
     ga4_(s.ga4, { dateRanges: [{ startDate: p.from, endDate: p.to }], dimensions: [{ name: 'date' }, { name: 'sessionDefaultChannelGroup' }], metrics: metrics, limit: 100000 })
       .forEach(function (r) { var d = r.d[0]; out.ga4.push([d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8), s.name, r.d[1]].concat(r.m)); });
+    var gt = {};
+    ga4_(s.ga4, {
+      dateRanges: [{ startDate: p.from, endDate: p.to }],
+      dimensions: [{ name: 'date' }, { name: 'hostName' }, { name: 'landingPage' }], metrics: metrics, limit: 100000,
+      dimensionFilter: { filter: { fieldName: 'sessionDefaultChannelGroup', stringFilter: { matchType: 'EXACT', value: 'Organic Search' } } },
+    }).forEach(function (r) {
+      var d = r.d[0], day = d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8), t = pageType_('https://' + r.d[1] + r.d[2]);
+      var a = gt[day + '|' + t] || (gt[day + '|' + t] = [day, s.name, t, 0, 0, 0]);
+      a[3] += r.m[0]; a[4] += r.m[1]; a[5] += r.m[2];
+    });
+    Object.keys(gt).forEach(function (k) { out.ga4Type.push(gt[k]); });
     ga4_(s.ga4, {
       dateRanges: [{ startDate: p.from, endDate: p.to }],
       dimensions: [{ name: 'sessionSource' }, { name: 'hostName' }, { name: 'landingPage' }],
@@ -170,6 +190,8 @@ function syncMonth_(p) {
   put('mkt_seoMarkets', ['site', 'country', 'device'].concat(g), out.markets);
   put('mkt_seoPageCountry', ['site', 'country', 'page'].concat(g), out.pageCountry);
   put('mkt_seoGa4', ['day', 'site', 'channel'].concat(a), out.ga4);
+  put('mkt_seoDailyType', ['day', 'site', 'type'].concat(g), out.dailyType);
+  put('mkt_seoGa4Type', ['day', 'site', 'type'].concat(a), out.ga4Type);
   put('mkt_seoAi', ['site', 'source', 'host', 'page'].concat(a), out.ai);
   put('mkt_seoLanding', ['site', 'host', 'page', 'channel'].concat(a), out.landing);
   commit_(writes);
@@ -297,6 +319,15 @@ function top_(rows) {
   var seen = {}; byC.forEach(function (r) { seen[r.keys.join('|')] = 1; });
   var byI = rows.slice().sort(function (a, b) { return b.impressions - a.impressions; }).filter(function (r) { return !seen[r.keys.join('|')]; }).slice(0, SEO.TOP);
   return byC.concat(byI);
+}
+
+// Page type from a URL — keep in step with pageType() in seo.js.
+function pageType_(url) {
+  var m = /^https?:\/\/([^\/?#]*)([^?#]*)/i.exec(String(url)), host = m ? m[1] : '', p = (m ? m[2] : String(url)).toLowerCase() || '/';
+  if (/^\/([a-z]{2}(-[a-z]{2})?\/?)?$/.test(p)) return 'Home';
+  if (/\/(blogs?|news|articles?|posts?|guides?)(\/|$)/.test(p)) return 'Blog';
+  if (/\/(lp|landing|go|promo|offers?)(\/|$)/.test(p) || /^lp[.-]/i.test(host)) return 'Landing';
+  return 'Site page';
 }
 
 // The top n rows (by clicks, then impressions) within each value of keys[0], e.g. top pages per country.
