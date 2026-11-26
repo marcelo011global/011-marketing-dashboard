@@ -61,7 +61,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="report-pdf.js"></script>
 <script type="module">
-import { initReport } from './reports.js?v=202611111615';
+import { initReport } from './reports.js?v=202611261858';
 initReport({
   title: 'VNUMBER enrollments', coll: 'mkt_vnEnroll',
   // Same status groups and colors as the Subscribers page: Active = Active + Sleeping; Not active = everything else.
@@ -70,10 +70,14 @@ initReport({
     r.group = /^(active|sleeping)$/i.test(String(r.status || '').trim()) ? 'Active' : 'Not active';
     const t = parseInt(r.term, 10);
     r.termLabel = t > 0 ? (t === 1 ? '1 month' : t + ' months') : 'Not synced yet';
+    // Source from the affiliate tag: GAds-* = Google Ads campaign, seo-* = SEO (blog / landing), blank = no tag.
+    const a = String(r.affiliate || '').trim();
+    r.affiliateLabel = a || (r.affiliate === undefined ? 'Not synced yet' : '(none)');
+    r.source = r.affiliate === undefined ? 'Not synced yet' : !a ? 'No affiliate tag' : /^gads/i.test(a) ? 'Google Ads' : /^(fb|meta|ig)\b|meta|facebook/i.test(a) ? 'Meta' : /^seo/i.test(a) ? 'SEO' : 'Other affiliate';
   },
   stack: { key: 'group', series: [{ v: 'Active', label: 'Active (Active + Sleeping)', color: '#3A6EA5' }, { v: 'Not active', label: 'Not active (Not Active + Pre-Suspended + Suspended)', color: '#EE7805' }] },
   dims: [{ key: 'didCountry', label: 'Number country', filter: true }, { key: 'originCountry', label: 'Customer country', filter: true },
-         { key: 'package', label: 'Plan', filter: true }, { key: 'termLabel', label: 'Months bought', filter: true }, { key: 'creator', label: 'Creator', filter: true }, { key: 'group', label: 'Status group' }, { key: 'status', label: 'Status', filter: true },
+         { key: 'package', label: 'Plan', filter: true }, { key: 'termLabel', label: 'Months bought', filter: true }, { key: 'source', label: 'Source', filter: true }, { key: 'affiliateLabel', label: 'Affiliate / campaign', filter: true }, { key: 'creator', label: 'Creator', filter: true }, { key: 'group', label: 'Status group' }, { key: 'status', label: 'Status', filter: true },
          { key: 'language', label: 'Language' }, { key: 'promo', label: 'Promo code' }],
   measures: [{ key: 'count', label: 'Enrollments', fmt: 'int' }, { key: 'amount', label: 'Initial charges', fmt: 'usd' }],
   kpis: (cur, prev, sum) => {

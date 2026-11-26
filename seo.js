@@ -12,6 +12,7 @@
 //   mkt_seoLanding  [site, host, page, channel, sessions, engaged, keyEvents]  GA4 landing pages, all channels
 //   mkt_seoDailyType [day, site, type, clicks, impressions, posw] · mkt_seoGa4Type [day, site, type, sessions, engaged, keyEvents]
 //                   per page type (Home / Blog / Landing / Site page) — the Overview "Pages" filter swaps these in
+//   mkt_vnEnroll    VNUMBER enrollments from ReportsSync (day, …, affiliate, count, amount, credit) — "SEO sales" tab
 //   mkt_seoBingDaily [day, site, clicks, impressions] · mkt_seoBingQueries / mkt_seoBingPages [site, query|page, clicks, impressions, posw]
 //                   Bing Webmaster Tools (bingSync in SeoSync.gs; ~6 months of history)
 // posw = average position × impressions, so positions can be summed and re-averaged.
@@ -37,12 +38,13 @@ const ALLOWED = ['@011global.com','@011telecom.com'];
 const allowedEmail = e => ALLOWED.some(d => (e || '').toLowerCase().endsWith(d));
 
 const COLLS = { daily: 'mkt_seoDaily', pages: 'mkt_seoPages', queries: 'mkt_seoQueries', markets: 'mkt_seoMarkets', pageCountry: 'mkt_seoPageCountry', ga4: 'mkt_seoGa4', ai: 'mkt_seoAi', landing: 'mkt_seoLanding', dailyType: 'mkt_seoDailyType', ga4Type: 'mkt_seoGa4Type',
+  vnEnroll: 'mkt_vnEnroll',   // VNUMBER enrollments (Reports API sync); affiliate seo-* = sale from an SEO page
   bingDaily: 'mkt_seoBingDaily', bingQueries: 'mkt_seoBingQueries', bingPages: 'mkt_seoBingPages' };
 const LATEST = { audit: 'mkt_seoAudit', speed: 'mkt_seoSpeed' };
 const SITES = [{ k: 'VNumber', c: '#EE7805' }, { k: '011 Global', c: '#3A6EA5' }, { k: 'GlobuSIM', c: '#6B8E23' }];
 const SCOLOR = Object.fromEntries(SITES.map(s => [s.k, s.c]));
 const VIEWS = [['overview', 'Overview'], ['pages', 'All pages'], ['blog', 'Blog'], ['landing', 'Landing pages'], ['queries', 'Queries'], ['markets', 'Markets'],
-  ['new', 'New pages'], ['technical', 'Technical'], ['speed', 'Speed'], ['ai', 'AI search'], ['bing', 'Bing'], ['paid', 'Paid vs organic'], ['alerts', 'Alerts']];
+  ['new', 'New pages'], ['technical', 'Technical'], ['speed', 'Speed'], ['ai', 'AI search'], ['bing', 'Bing'], ['sales', 'SEO sales'], ['paid', 'Paid vs organic'], ['alerts', 'Alerts']];
 const FOCUS = new Set(['usa', 'can', 'bra', 'isr', 'gbr', 'nld', 'mex', 'arg', 'ury', 'col']);   // diaspora focus markets
 const BRAND_RE = /v\s?numbers?|\b011\b|zero eleven|globu\s?sim/i;
 const QUESTION_RE = /^(how|what|which|where|why|when|who|can|could|does|do|is|are|should|will|best|cheapest)\b|\?|\bvs\.?\b/i;
@@ -220,7 +222,7 @@ function start(data, getPaid){
     const inRange = keys.filter(k => k >= st.from && k <= st.to), n = inRange.length, i0 = keys.indexOf(st.from);
     const prevKeys = i0 - n >= 0 ? keys.slice(i0 - n, i0) : [];
     const passSite = r => !st.site || r.site === st.site;
-    const rowsOf = (name, ks) => ks.flatMap(k => (data[name].months[k] || [])).filter(passSite);
+    const rowsOf = (name, ks) => ks.flatMap(k => (data[name].months[k] || [])).filter(name === 'vnEnroll' ? () => !st.site || st.site === 'VNumber' : passSite);
     const C = {}, Pv = {};
     Object.keys(COLLS).forEach(name => { C[name] = rowsOf(name, inRange); Pv[name] = rowsOf(name, prevKeys); });
     // Overview "Pages" filter: swap in the per-page-type series so the KPIs, chart and site table all follow it.
@@ -256,7 +258,7 @@ function start(data, getPaid){
     const al = alertList(ctx), high = al.filter(a => a.sev === 'High').length;
     const at = $('views').querySelector('[data-v="alerts"]'); at.innerHTML = 'Alerts' + (al.length ? ` <span class="pill ${high ? 'p-loss' : 'p-low'}">${al.length}</span>` : '');
     ctx.alerts = al;
-    $('body').innerHTML = ({ overview, pages, blog, landing, queries, markets, new: newPages, technical, speed, ai, bing, paid, alerts })[v](ctx);
+    $('body').innerHTML = ({ overview, pages, blog, landing, queries, markets, new: newPages, technical, speed, ai, bing, sales, paid, alerts })[v](ctx);
     $('body').querySelectorAll('[data-more]').forEach(b => b.onclick = () => { st.open[b.dataset.more] = !st.open[b.dataset.more]; render(); });
     $('body').querySelectorAll('[data-seg]').forEach(b => b.onclick = () => { st[b.dataset.seg] = b.dataset.val; render(); });
     $('body').querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = '#/' + b.dataset.go; });
@@ -499,6 +501,67 @@ function start(data, getPaid){
       + table('blog', 'Blog posts in Google Search', 'Language from the URL (/pt/, ?lang=); * = no code in the URL, guessed from its words. Decaying: clicks down over 20% vs prior period. Low CTR: under 1% on 1,000+ impressions. Page 2: position 11–20.', [
         pcell(a => a.k, a => a.r.site), { l: 'Language', f: a => esc(a.lang) + (a.guess && a.lang !== 'Unknown' ? '<span class="note" title="No language code in the URL; guessed from the words in it"> *</span>' : '') },
         ...gscCols(hasPrev, prev), { l: 'Flags', f: a => a.flags.map(([t, c]) => pill(t, c)).join('') || '—' }], list, { limit: 25, tools });
+  }
+
+  // ── SEO sales: VNUMBER enrollments whose affiliate tag is seo-* (seo-blog-es, seo-lp-…), tied to blog traffic ──
+  function sales(ctx){
+    const { C, Pv, hasPrev, inRange } = ctx;
+    if (st.site && st.site !== 'VNumber') return panel('SEO sales', 'VNUMBER only', '<p class="empty">Sales tags come from the VNUMBER enrollment report. Choose All sites or VNumber.</p>');
+    if (!C.vnEnroll.some(r => r.affiliate !== undefined)) return panel('SEO sales', 'VNUMBER enrollments by affiliate tag', '<p class="empty">No affiliate data yet. Paste the updated ReportsSync.gs into the Reports Sync script and run backfill() once.</p>');
+    const tagOf = r => String(r.affiliate || '').trim();
+    const srcOf = a => !a ? 'No affiliate tag' : /^gads/i.test(a) ? 'Google Ads' : /^(fb|meta|ig)\b|meta|facebook/i.test(a) ? 'Meta' : /^seo/i.test(a) ? 'SEO' : 'Other affiliate';
+    const isSeo = r => /^seo/i.test(tagOf(r));
+    // seo-blog-es → { kind: 'Blog', lang: 'Spanish' }; seo-lp-xx / seo-landing-xx → Landing.
+    const parse = t => {
+      const p = t.toLowerCase().split(/[-_]/);
+      const kind = p[1] === 'blog' ? 'Blog' : /^(lp|landing)$/.test(p[1]) ? 'Landing' : /^(home|web|site)$/.test(p[1]) ? 'Home' : 'Other';
+      const lc = p.slice(2).find(x => LANGS[x]);
+      return { kind, lang: lc ? LANGS[lc] : '' };
+    };
+    const agg = (rows, kf) => {
+      const m = new Map();
+      rows.forEach(r => {
+        const k = kf(r), a = m.get(k) || { k, n: 0, sales: 0, multi: 0, active: 0 }, c = +r.count || 0;
+        a.n += c; a.sales += (+r.amount || 0) + (+r.credit || 0);
+        if (+r.term > 1) a.multi += c;
+        if (/^(active|sleeping)$/i.test(String(r.status || '').trim())) a.active += c;
+        m.set(k, a);
+      });
+      return m;
+    };
+    const all = C.vnEnroll, seo = all.filter(isSeo), seoP = Pv.vnEnroll.filter(isSeo);
+    const tN = sum(all, 'count'), sN = sum(seo, 'count'), sP = sum(seoP, 'count');
+    const sS = sum(seo, 'amount') + sum(seo, 'credit'), sSP = sum(seoP, 'amount') + sum(seoP, 'credit');
+    const gaK = sum(C.ga4.filter(r => r.site === 'VNumber' && r.channel === 'Organic Search'), 'keyEvents');
+    // Blog clicks per language on vnumber.com, to put next to each seo-blog-xx tag.
+    const blogBy = new Map();
+    C.pages.filter(r => r.site === 'VNumber' && pageType(r.page) === 'Blog').forEach(r => { const l = langOf(r.page).lang; blogBy.set(l, (blogBy.get(l) || 0) + (+r.clicks || 0)); });
+    const dl = (a, b) => hasPrev && b ? ' <span class="note">' + delta(a, b) + '</span>' : '';
+    const sstats = `<section class="panel"><div class="sstats">
+      <div class="stat"><span class="lbl">SEO enrollments</span><b>${N(sN)}</b>${dl(sN, sP)}</div>
+      <div class="stat"><span class="lbl">SEO initial sales</span><b>$${N(Math.round(sS))}</b>${dl(sS, sSP)}<span class="note">initial charge + credit</span></div>
+      <div class="stat"><span class="lbl">Share of VNUMBER enrollments</span><b>${P(sN / tN)}</b><span class="note">${N(tN)} in total</span></div>
+      <div class="stat"><span class="lbl">Avg first sale</span><b>${sN ? '$' + (sS / sN).toFixed(2) : '—'}</b></div>
+      <div class="stat"><span class="lbl">GA4 organic conversions</span><b>${N(gaK)}</b><span class="note">vnumber.com · tracking check vs ${N(sN)} tagged sales</span></div></div></section>`;
+    const days = [...new Set(all.map(r => r.day))].sort(), by = {};
+    all.forEach(r => { const k = srcOf(tagOf(r)) + '|' + r.day; by[k] = (by[k] || 0) + (+r.count || 0); });
+    const SRC = [['SEO', '#1E7F4F'], ['Google Ads', '#EE7805'], ['Meta', '#3A6EA5'], ['Other affiliate', '#8A6FB0'], ['No affiliate tag', '#A8A29E']];
+    ctx.after = [lineChart('salestrend', days.map(d => dayLabel(d, inRange.length > 1)),
+      SRC.filter(([k]) => days.some(d => by[k + '|' + d])).map(([k, c]) => ({ label: k, data: days.map(d => by[k + '|' + d] || 0), borderColor: c, backgroundColor: c })))];
+    const cols = prev => [{ l: 'Enrollments', f: a => N(a.n) }, { l: 'Share', f: a => P(a.n / tN) }, { l: 'Initial sales', f: a => '$' + N(Math.round(a.sales)) },
+      { l: 'Avg first sale', f: a => a.n ? '$' + (a.sales / a.n).toFixed(2) : '—' }, { l: 'Multi-month', f: a => P(a.multi / a.n) }, { l: 'Still active', f: a => P(a.active / a.n) },
+      ...(hasPrev ? [{ l: 'vs prior', f: a => delta(a.n, prev.get(a.k)?.n || 0) }] : [])];
+    const ms = agg(all, r => srcOf(tagOf(r))), mp = agg(Pv.vnEnroll, r => srcOf(tagOf(r)));
+    const srcTbl = table('salessrc', 'VNUMBER enrollments by source', 'From the affiliate tag: GAds-… = Google Ads campaign, seo-… = SEO page, blank = no tag (direct, untagged organic, app…)', [
+      { l: 'Source', f: a => esc(a.k) + (a.k === 'SEO' ? ' <span class="pill p-new">SEO</span>' : ''), t: a => a.k }, ...cols(mp)], [...ms.values()].sort((a, b) => b.n - a.n));
+    const ts = agg(seo, tagOf), tp = agg(seoP, tagOf);
+    const tagRows = [...ts.values()].map(a => ({ ...a, ...parse(a.k) }))
+      .map(a => ({ ...a, clicks: a.kind === 'Blog' && a.lang ? blogBy.get(a.lang) || 0 : null })).sort((a, b) => b.n - a.n);
+    const tagTbl = table('salestag', 'SEO sales by tag', 'Each seo-… tag is a page or group of pages. Blog clicks = Google clicks to vnumber.com blog posts in that language.', [
+      { l: 'Tag', f: a => esc(a.k), t: a => a.k }, { l: 'Page type', f: a => esc(a.kind) }, { l: 'Language', f: a => esc(a.lang || '—') }, ...cols(tp),
+      { l: 'Blog clicks', f: a => a.clicks === null ? '—' : N(a.clicks) }, { l: 'Sales per 1,000 clicks', f: a => a.clicks ? (a.n / a.clicks * 1000).toFixed(1) : '—' },
+    ], tagRows);
+    return sstats + `<section class="panel"><div class="ph"><h2>VNUMBER enrollments per day by source</h2><p class="note">Affiliate tag on each enrollment · Reports API</p></div><div class="chart"><canvas id="salestrend"></canvas></div></section>` + tagTbl + srcTbl;
   }
 
   // ── Bing (Bing Webmaster Tools) ──

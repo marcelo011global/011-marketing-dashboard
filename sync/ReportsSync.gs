@@ -19,7 +19,7 @@
  * numbers, customer IDs or other personal fields are stored:
  *   mkt_sales/{YYYY-MM}   packages-profitability, same rows as the Sales page's xlsx
  *                         upload: [market, type, package, subscribers, minutes, charged, cost, didCost]
- *   mkt_vnEnroll/{YYYY-MM} VNUMBER enrollments (incl. term = months interval), counted by day × DID country × origin country ×
+ *   mkt_vnEnroll/{YYYY-MM} VNUMBER enrollments (incl. term = months interval, affiliate = affiliateName: Google Ads campaign or seo-* tag), counted by day × DID country × origin country ×
  *                         package × creator × status × language × promo code
  *   mkt_subs/{YYYY-MM}    new subscribers, counted by day × plan × agent × creator × status × auto top-up
  *   mkt_mr/{YYYY-MM}      mobile-recharge revenue by day × market × rep (already aggregated by the API)
@@ -89,10 +89,10 @@ function syncMonth_(p) {
 
   var en = data_('vnumber-enrollments', { year: p.y, month: p.m });
   put('mkt_vnEnroll',
-    ['day', 'didCountry', 'originCountry', 'package', 'creator', 'status', 'language', 'promo', 'term',
+    ['day', 'didCountry', 'originCountry', 'package', 'creator', 'status', 'language', 'promo', 'term', 'affiliate',
      'count', 'amount', 'credit', 'closed', 'inMin', 'outMin', 'inSms', 'outSms'],
     cube_(en, function (r) {
-      return [day_(r.creationDate), r.dIDCountry, r.originCountry, r.package, r.creator, r.status, r.language, r.promo_code || '', term_(r)];
+      return [day_(r.creationDate), r.dIDCountry, r.originCountry, r.package, r.creator, r.status, r.language, r.promo_code || '', term_(r), r.affiliateName || ''];
     }, function (r) {
       return [1, +r.amount || 0, +r.credit || 0, r.closerDate ? 1 : 0, +r.incomingMinutes || 0, +r.outgoingMinutes || 0,
               +r.incomingSms || 0, +r.outgoingSms || 0];
