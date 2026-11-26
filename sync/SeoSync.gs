@@ -337,6 +337,37 @@ function call_(url, opt) {
 }
 function round2_(v) { return Math.round((+v || 0) * 100) / 100; }
 
+// ───────────────────────── Bing Webmaster Tools (probe) ─────────────────────────
+// Needs Script property BING_API_KEY (Bing Webmaster Tools → Settings → API access → API key).
+// probeBing() logs which sites the key can read and the shape of each report (field names and
+// one sample row, no data stored), so the Bing sync can be built on the real responses.
+var BING = { BASE: 'https://ssl.bing.com/webmaster/api.svc/json/' };
+function bing_(method, params) {
+  var key = PropertiesService.getScriptProperties().getProperty('BING_API_KEY');
+  if (!key) throw new Error('Set BING_API_KEY in Project Settings → Script properties.');
+  var q = Object.keys(params || {}).map(function (k) { return k + '=' + encodeURIComponent(params[k]); });
+  q.push('apikey=' + key);
+  var resp = UrlFetchApp.fetch(BING.BASE + method + '?' + q.join('&'), { muteHttpExceptions: true });
+  var code = resp.getResponseCode();
+  if (code !== 200) throw new Error('Bing ' + method + ' → ' + code + ': ' + resp.getContentText().slice(0, 300));
+  var body = JSON.parse(resp.getContentText() || '{}');
+  return body.d !== undefined ? body.d : body;
+}
+function probeBing() {
+  var sites = bing_('GetUserSites', {});
+  Logger.log('Bing sites: ' + (sites || []).map(function (s) { return s.Url + (s.IsVerified ? '' : ' (not verified)'); }).join(', '));
+  (sites || []).filter(function (s) { return s.IsVerified; }).forEach(function (s) {
+    ['GetRankAndTrafficStats', 'GetQueryStats', 'GetPageStats', 'GetQueryPageStats'].forEach(function (m) {
+      try {
+        var r = bing_(m, { siteUrl: s.Url });
+        var rows = Array.isArray(r) ? r : [];
+        Logger.log(s.Url + ' · ' + m + ': ' + rows.length + ' rows; fields ' + (rows[0] ? Object.keys(rows[0]).join(', ') : '—') +
+          (rows[0] ? '; sample ' + JSON.stringify(rows[0]).slice(0, 300) : ''));
+      } catch (e) { Logger.log(s.Url + ' · ' + m + ': ' + e.message); }
+    });
+  });
+}
+
 // ───────────────────────── Firestore (same as ReportsSync.gs) ─────────────────────────
 function upsert_(path, obj) { return { update: { name: SEO.FIRESTORE + '/' + path, fields: toFields_(obj) } }; }
 function commit_(writes) {
