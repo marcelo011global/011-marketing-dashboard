@@ -67,6 +67,9 @@ function deltaPos(cur, prev){
   const d = prev - cur;
   return `<span class="delta ${d >= 0 ? 'up' : 'down'}" title="Positions ${d >= 0 ? 'gained' : 'lost'}">${d >= 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(1)}</span>`;
 }
+// A page label that opens the live page in a new tab (plain text if it isn't a web address).
+const plink = (url, text) => /^https?:\/\//i.test(String(url))
+  ? `<a class="plink" href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>` : esc(text);
 const siteDot = s => `<span class="mk" style="background:${SCOLOR[s] || '#888'}"></span>`;
 
 // ── Loading ──
@@ -355,7 +358,7 @@ function start(data, getPaid){
       <input type="search" id="q-pages" data-q="pages" placeholder="Find a page" value="${esc(st.q.pages)}" aria-label="Find a page"></div>`;
     const stats = `<section class="panel"><div class="sstats">${['Home', 'Landing', 'Blog', 'Site page'].map(t => `<div class="stat"><span class="lbl">${t === 'Site page' ? 'Other pages' : t} clicks</span><b>${N(typeCount(t))}</b></div>`).join('')}</div></section>`;
     return stats + movers + table('pages', 'Pages in Google results', `${list.length.toLocaleString('en-US')} pages · Search Console, top pages per site per month`, [
-      { l: 'Page', f: a => siteDot(a.r.site) + esc(a.label), t: a => a.k }, { l: 'Type', f: a => esc(a.type) }, ...gscCols(hasPrev, prev),
+      { l: 'Page', f: a => siteDot(a.r.site) + plink(a.k, a.label), t: a => a.k }, { l: 'Type', f: a => esc(a.type) }, ...gscCols(hasPrev, prev),
     ], list, { limit: 25, tools });
   }
 
@@ -412,7 +415,7 @@ function start(data, getPaid){
         ? 'No page-by-country data yet: run backfill() in the SEO Sync script once to load it'
         : 'Pages Google searchers in ' + cname(st.country) + ' clicked through to · top 25 pages per site per month';
       detail = `<div id="cpages">${table('cpages', 'Pages visited from ' + cname(st.country), note, [
-        { l: 'Page', f: a => esc(label(a.k)), t: a => a.k }, { l: 'Type', f: a => esc(pageType(a.k) === 'Site page' ? 'Other' : pageType(a.k)) },
+        { l: 'Page', f: a => plink(a.k, label(a.k)), t: a => a.k }, { l: 'Type', f: a => esc(pageType(a.k) === 'Site page' ? 'Other' : pageType(a.k)) },
         ...gscCols(hasPrev, pp), { l: 'Share of country clicks', f: a => P(a.clicks / ct.clicks) },
       ], list, { limit: 25, wide: true, tools: '<div class="tools"><button type="button" class="more" data-country="' + esc(st.country) + '">Close</button></div>' })}</div>`;
     }
@@ -445,7 +448,7 @@ function start(data, getPaid){
     const sessCols = [{ l: 'Sessions', f: a => N(a.sessions) }, { l: 'Engaged', f: a => P(a.engaged / a.sessions) }, { l: 'Key events', f: a => N(a.keyEvents) }];
     return stats + warn + `<section class="panel"><div class="ph"><h2>AI Assistant sessions per day</h2><p class="note">GA4 channel group "AI Assistant"</p></div><div class="chart"><canvas id="aitrend"></canvas></div></section>
       <div class="grid2">${table('aisrc', 'By assistant', 'Session source (ChatGPT, Perplexity, Gemini, Copilot, Claude…)', [{ l: 'Source', f: a => esc(a.k), t: a => a.k }, ...sessCols, { l: 'Share', f: a => P(a.sessions / aiS) }, ...(hasPrev ? [{ l: 'vs prior', f: a => delta(a.sessions, srcP.get(a.k)?.sessions || 0) }] : [])], src, { limit: 10 })}
-      ${table('ailp', 'Where AI visitors land', 'Landing page (GA4)', [{ l: 'Page', f: a => siteDot(a.r.site) + esc(a.r.host.replace(/^www\./, '') + a.r.page) + (STAGING_RE.test(a.r.host) ? ' <span class="pill p-loss">staging</span>' : ''), t: a => a.r.host + a.r.page }, ...sessCols], lp, { limit: 10 })}</div>
+      ${table('ailp', 'Where AI visitors land', 'Landing page (GA4)', [{ l: 'Page', f: a => siteDot(a.r.site) + plink('https://' + a.r.host + a.r.page, a.r.host.replace(/^www\./, '') + a.r.page) + (STAGING_RE.test(a.r.host) ? ' <span class="pill p-loss">staging</span>' : ''), t: a => a.r.host + a.r.page }, ...sessCols], lp, { limit: 10 })}</div>
       ${table('aiq', 'Question-style searches on Google', 'The kind of questions people also ask AI assistants: answer them clearly on the page', [{ l: 'Query', f: a => siteDot(a.r.site) + esc(a.r.query), t: a => a.r.query }, { l: 'Impressions', f: a => N(a.impressions) }, { l: 'Clicks', f: a => N(a.clicks) }, { l: 'Position', f: a => POS(pos(a)) }], qs, { limit: 15, wide: true })}`;
   }
 
@@ -453,7 +456,7 @@ function start(data, getPaid){
   const passSt = r => !st.site || r.site === st.site;
   const plabel = u => { try { const x = new URL(u); return (st.site ? '' : x.host.replace(/^www\./, '')) + x.pathname + x.search; } catch { return String(u); } };
   const pathOf = u => { try { const x = new URL(u); return x.host.replace(/^www\./, '') + x.pathname; } catch { return String(u); } };
-  const pcell = (u, site) => ({ l: 'Page', f: r => siteDot(site(r)) + esc(plabel(u(r))), t: r => u(r) });
+  const pcell = (u, site) => ({ l: 'Page', f: r => siteDot(site(r)) + plink(u(r), plabel(u(r))), t: r => u(r) });
   const pill = (t, c) => `<span class="pill ${c}">${esc(t)}</span>`;
   const panel = (title, note, html) => `<section class="panel"><div class="ph"><h2>${esc(title)}</h2><p class="note">${esc(note)}</p></div>${html}</section>`;
   const stats = list => `<section class="panel"><div class="sstats">${list.map(([l, v, bad]) => `<div class="stat"><span class="lbl">${esc(l)}</span><b${bad ? ' class="down"' : ''}>${v}</b></div>`).join('')}</div></section>`;
@@ -533,7 +536,7 @@ function start(data, getPaid){
       { l: 'Query', f: a => esc(a.k.split('|').slice(1).join('|')) + (st.site ? '' : ' ' + siteDot(a.k.split('|')[0])), t: a => a.k.split('|').slice(1).join('|') }, ...gscCols(hasPrev, qp)], sortL(qc), { limit: 20 });
     const label = u => { try { const x = new URL(u); return (st.site ? '' : x.host.replace(/^www\./, '')) + x.pathname + x.search; } catch { return u; } };
     const pTbl = table('bingp', 'Top pages on Bing', 'Pages Bing searchers clicked through to', [
-      { l: 'Page', f: a => esc(label(a.k)), t: a => a.k }, ...gscCols(hasPrev, pp)], sortL(pc), { limit: 20 });
+      { l: 'Page', f: a => plink(a.k, label(a.k)), t: a => a.k }, ...gscCols(hasPrev, pp)], sortL(pc), { limit: 20 });
     return sstats + `<section class="panel"><div class="ph"><h2>${metric === 'clicks' ? 'Clicks from Bing' : 'Impressions in Bing results'} per day</h2><div class="tools">${seg('metric', [['clicks', 'Clicks'], ['impressions', 'Impressions']])}<p class="note">Bing Webmaster Tools · about 6 months of history</p></div></div><div class="chart"><canvas id="bingtrend"></canvas></div></section>`
       + vsTbl + qTbl + pTbl;
   }
@@ -556,7 +559,7 @@ function start(data, getPaid){
     const tools = `<div class="tools">${seg('lpOnly', [['yes', 'Landing pages'], ['no', 'All pages']])}</div>`;
     return stats([['Landing pages in Google', N(gsc.length)], ['Organic clicks', N(gsc.reduce((s, a) => s + a.clicks, 0))], ['GA4 sessions', N(ga.reduce((s, a) => s + a.sessions, 0))], ['Key events', N(ga.reduce((s, a) => s + a.keyEvents, 0))]])
       + table('lpga', 'Traffic and conversions by landing page (GA4)', 'All channels. Landing pages: lp. subdomains or /lp/, /landing/, /go/, /promo/, /offer/ paths', [
-        { l: 'Page', f: a => siteDot(a.r.site) + esc((st.site ? '' : a.r.host.replace(/^www\./, '')) + a.r.page), t: a => a.r.host + a.r.page },
+        { l: 'Page', f: a => siteDot(a.r.site) + plink('https://' + a.r.host + a.r.page, (st.site ? '' : a.r.host.replace(/^www\./, '')) + a.r.page), t: a => a.r.host + a.r.page },
         { l: 'Sessions', f: a => N(a.sessions) }, { l: 'Organic', f: a => N(a.organic) }, { l: 'Paid search', f: a => N(a.search) }, { l: 'Paid social / other paid', f: a => N(a.social) }, { l: 'Other', f: a => N(a.other) },
         { l: 'Key events', f: a => N(a.keyEvents) }, { l: 'Key-event rate', f: a => P(a.keyEvents / a.sessions) }], ga, { limit: 20, tools })
       + table('lpgsc', 'Landing pages in Google Search', 'Organic only (Search Console)', [pcell(a => a.k, a => a.r.site), ...gscCols(hasPrev, prev)], gsc, { limit: 15 });
