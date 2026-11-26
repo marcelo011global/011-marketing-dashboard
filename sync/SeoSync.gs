@@ -21,6 +21,12 @@
  * posw = average position × impressions, so the page can sum and re-average positions.
  * Each doc: {month, cols: JSON header, rows: JSON rows, rowCount, source:'seo-sync', syncedAt}.
  *
+ * Bing Webmaster Tools (bingSync(), run by dailySync() when Script property BING_API_KEY is set;
+ * Bing returns its whole history, ~6 months, so every month it has is rewritten each run):
+ *   mkt_seoBingDaily/{YYYY-MM}    [day, site, clicks, impressions]
+ *   mkt_seoBingQueries/{YYYY-MM}  [site, query, clicks, impressions, posw]   posw = avg impression position × impressions
+ *   mkt_seoBingPages/{YYYY-MM}    [site, page, clicks, impressions, posw]
+ *
  * Weekly snapshots, one doc each ({cols, rows, rowCount, source, syncedAt}):
  *   mkt_seoAudit/latest  auditSync(): for each site's top pages (last 28 days) and new pages (first Google
  *                        impression in the last 90 days): HTTP status, noindex, title / description length,
@@ -60,7 +66,13 @@ var SEO = {
 
 // ───────────────────────── Entry points ─────────────────────────
 function backfill() { requireScopes_(); monthsBack_(15).forEach(syncMonth_); }
-function dailySync() { requireScopes_(); monthsBack_(1).forEach(syncMonth_); }
+function dailySync() {
+  requireScopes_(); monthsBack_(1).forEach(syncMonth_);
+  // Bing runs after Google and never blocks it: no key set → skipped; an error is logged and the run still succeeds.
+  if (PropertiesService.getScriptProperties().getProperty('BING_API_KEY')) {
+    try { bingSync(); } catch (e) { Logger.log('Bing sync failed: ' + e.message); }
+  }
+}
 
 function installDailyTrigger() {
   requireScopes_();
@@ -337,7 +349,7 @@ function call_(url, opt) {
 }
 function round2_(v) { return Math.round((+v || 0) * 100) / 100; }
 
-// ───────────────────────── Bing Webmaster Tools (probe) ─────────────────────────
+// ───────────────────────── Bing Webmaster Tools ─────────────────────────
 // Needs Script property BING_API_KEY (Bing Webmaster Tools → Settings → API access → API key).
 // probeBing() logs which sites the key can read and the shape of each report (field names and
 // one sample row, no data stored), so the Bing sync can be built on the real responses.
@@ -353,6 +365,48 @@ function bing_(method, params) {
   var body = JSON.parse(resp.getContentText() || '{}');
   return body.d !== undefined ? body.d : body;
 }
+// Site name for a Bing site URL, by matching its domain to SEO.SITES ('sc-domain:vnumber.com' ↔ https://vnumber.com/).
+function bingSiteName_(url) {
+  var host = String(url).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').toLowerCase();
+  var hit = SEO.SITES.filter(function (s) { return String(s.gsc).replace(/^sc-domain:/, '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '').toLowerCase() === host; })[0];
+  return hit ? hit.name : null;
+}
+// "/Date(1772668800000)/" → '2026-03-05' (Bing dates are midnight UTC).
+function bingDay_(d) { var m = /\((-?\d+)/.exec(String(d)); return m ? Utilities.formatDate(new Date(+m[1]), 'UTC', 'yyyy-MM-dd') : ''; }
+
+function bingSync() {
+  var months = {};   // 'YYYY-MM' → { daily: [], queries: {}, pages: {} }
+  var M = function (day) { var k = day.slice(0, 7); return months[k] = months[k] || { daily: [], queries: {}, pages: {} }; };
+  var addTo = function (map, site, key, r) {
+    var k = site + '\u0001' + key, a = map[k] || (map[k] = [site, key, 0, 0, 0]);
+    var imp = +r.Impressions || 0, ps = +r.AvgImpressionPosition || 0;
+    a[2] += +r.Clicks || 0; a[3] += imp; if (ps > 0) a[4] += ps * imp;
+  };
+  var sites = (bing_('GetUserSites', {}) || []).filter(function (s) { return s.IsVerified && bingSiteName_(s.Url); });
+  sites.forEach(function (s) {
+    var name = bingSiteName_(s.Url);
+    (bing_('GetRankAndTrafficStats', { siteUrl: s.Url }) || []).forEach(function (r) {
+      var day = bingDay_(r.Date); if (day) M(day).daily.push([day, name, +r.Clicks || 0, +r.Impressions || 0]);
+    });
+    (bing_('GetQueryStats', { siteUrl: s.Url }) || []).forEach(function (r) { var day = bingDay_(r.Date); if (day) addTo(M(day).queries, name, r.Query, r); });
+    (bing_('GetPageStats', { siteUrl: s.Url }) || []).forEach(function (r) { var day = bingDay_(r.Date); if (day) addTo(M(day).pages, name, r.Query, r); });
+  });
+  var vals = function (map) { return Object.keys(map).map(function (k) { var a = map[k]; a[4] = round2_(a[4]); return a; }); };
+  var writes = [], log = [], now = new Date().toISOString();
+  Object.keys(months).sort().forEach(function (k) {
+    var m = months[k], put = function (coll, cols, rows) {
+      rows = fit_(cols, rows);
+      writes.push(upsert_(coll + '/' + k, { month: k, cols: JSON.stringify(cols), rows: JSON.stringify(rows), rowCount: rows.length, source: 'bing', syncedAt: now }));
+    };
+    put('mkt_seoBingDaily', ['day', 'site', 'clicks', 'impressions'], m.daily);
+    put('mkt_seoBingQueries', ['site', 'query', 'clicks', 'impressions', 'posw'], vals(m.queries));
+    put('mkt_seoBingPages', ['site', 'page', 'clicks', 'impressions', 'posw'], vals(m.pages));
+    log.push(k + ' ' + m.daily.length + 'd/' + Object.keys(m.queries).length + 'q/' + Object.keys(m.pages).length + 'p');
+  });
+  commit_(writes);
+  Logger.log('Bing: ' + sites.map(function (s) { return bingSiteName_(s.Url); }).join(', ') + ' · ' + log.join(' · '));
+}
+
 function probeBing() {
   var sites = bing_('GetUserSites', {});
   Logger.log('Bing sites: ' + (sites || []).map(function (s) { return s.Url + (s.IsVerified ? '' : ' (not verified)'); }).join(', '));

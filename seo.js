@@ -10,6 +10,8 @@
 //   mkt_seoGa4      [day, site, channel, sessions, engaged, keyEvents]  GA4 sessions by channel group
 //   mkt_seoAi       [site, source, host, page, sessions, engaged, keyEvents]  visits from AI assistants
 //   mkt_seoLanding  [site, host, page, channel, sessions, engaged, keyEvents]  GA4 landing pages, all channels
+//   mkt_seoBingDaily [day, site, clicks, impressions] · mkt_seoBingQueries / mkt_seoBingPages [site, query|page, clicks, impressions, posw]
+//                   Bing Webmaster Tools (bingSync in SeoSync.gs; ~6 months of history)
 // posw = average position × impressions, so positions can be summed and re-averaged.
 // Weekly snapshots (one doc 'latest' each, {cols, rows, syncedAt}):
 //   mkt_seoAudit/latest  on-page checks + URL Inspection for top and new pages
@@ -32,12 +34,13 @@ const auth = getAuth(app), db = getFirestore(app);
 const ALLOWED = ['@011global.com','@011telecom.com'];
 const allowedEmail = e => ALLOWED.some(d => (e || '').toLowerCase().endsWith(d));
 
-const COLLS = { daily: 'mkt_seoDaily', pages: 'mkt_seoPages', queries: 'mkt_seoQueries', markets: 'mkt_seoMarkets', pageCountry: 'mkt_seoPageCountry', ga4: 'mkt_seoGa4', ai: 'mkt_seoAi', landing: 'mkt_seoLanding' };
+const COLLS = { daily: 'mkt_seoDaily', pages: 'mkt_seoPages', queries: 'mkt_seoQueries', markets: 'mkt_seoMarkets', pageCountry: 'mkt_seoPageCountry', ga4: 'mkt_seoGa4', ai: 'mkt_seoAi', landing: 'mkt_seoLanding',
+  bingDaily: 'mkt_seoBingDaily', bingQueries: 'mkt_seoBingQueries', bingPages: 'mkt_seoBingPages' };
 const LATEST = { audit: 'mkt_seoAudit', speed: 'mkt_seoSpeed' };
 const SITES = [{ k: 'VNumber', c: '#EE7805' }, { k: '011 Global', c: '#3A6EA5' }, { k: 'GlobuSIM', c: '#6B8E23' }];
 const SCOLOR = Object.fromEntries(SITES.map(s => [s.k, s.c]));
 const VIEWS = [['overview', 'Overview'], ['pages', 'All pages'], ['blog', 'Blog'], ['landing', 'Landing pages'], ['queries', 'Queries'], ['markets', 'Markets'],
-  ['new', 'New pages'], ['technical', 'Technical'], ['speed', 'Speed'], ['ai', 'AI search'], ['paid', 'Paid vs organic'], ['alerts', 'Alerts']];
+  ['new', 'New pages'], ['technical', 'Technical'], ['speed', 'Speed'], ['ai', 'AI search'], ['bing', 'Bing'], ['paid', 'Paid vs organic'], ['alerts', 'Alerts']];
 const FOCUS = new Set(['usa', 'can', 'bra', 'isr', 'gbr', 'nld', 'mex', 'arg', 'ury', 'col']);   // diaspora focus markets
 const BRAND_RE = /v\s?numbers?|\b011\b|zero eleven|globu\s?sim/i;
 const QUESTION_RE = /^(how|what|which|where|why|when|who|can|could|does|do|is|are|should|will|best|cheapest)\b|\?|\bvs\.?\b/i;
@@ -216,7 +219,7 @@ function start(data, getPaid){
     const al = alertList(ctx), high = al.filter(a => a.sev === 'High').length;
     const at = $('views').querySelector('[data-v="alerts"]'); at.innerHTML = 'Alerts' + (al.length ? ` <span class="pill ${high ? 'p-loss' : 'p-low'}">${al.length}</span>` : '');
     ctx.alerts = al;
-    $('body').innerHTML = ({ overview, pages, blog, landing, queries, markets, new: newPages, technical, speed, ai, paid, alerts })[v](ctx);
+    $('body').innerHTML = ({ overview, pages, blog, landing, queries, markets, new: newPages, technical, speed, ai, bing, paid, alerts })[v](ctx);
     $('body').querySelectorAll('[data-more]').forEach(b => b.onclick = () => { st.open[b.dataset.more] = !st.open[b.dataset.more]; render(); });
     $('body').querySelectorAll('[data-seg]').forEach(b => b.onclick = () => { st[b.dataset.seg] = b.dataset.val; render(); });
     $('body').querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = '#/' + b.dataset.go; });
@@ -452,6 +455,46 @@ function start(data, getPaid){
       + panel('Top blog posts', 'Organic clicks', `<div class="chart" style="height:${Math.max(160, top.length * 30 + 40)}px"><canvas id="blogtop"></canvas></div>`)
       + table('blog', 'Blog posts in Google Search', 'Decaying: clicks down over 20% vs prior period. Low CTR: under 1% on 1,000+ impressions. Page 2: position 11–20.', [
         pcell(a => a.k, a => a.r.site), ...gscCols(hasPrev, prev), { l: 'Flags', f: a => a.flags.map(([t, c]) => pill(t, c)).join('') || '—' }], list, { limit: 25 });
+  }
+
+  // ── Bing (Bing Webmaster Tools) ──
+  function bing(ctx){
+    const { C, Pv, hasPrev, inRange } = ctx;
+    if (!Object.keys(data.bingDaily?.months || {}).length)
+      return panel('Bing', 'Bing Webmaster Tools', '<p class="empty">No Bing data yet. Set Script property BING_API_KEY in the SEO Sync script and run bingSync() once; the daily sync keeps it current after that.</p>');
+    const metric = st.metric === 'impressions' ? 'impressions' : 'clicks';
+    const days = [...new Set(C.bingDaily.map(r => r.day))].sort();
+    const sites = st.site ? [st.site] : SITES.map(s => s.k);
+    const by = {}; C.bingDaily.forEach(r => { const k = r.site + '|' + r.day; by[k] = (by[k] || 0) + (+r[metric] || 0); });
+    ctx.after = [lineChart('bingtrend', days.map(d => dayLabel(d, inRange.length > 1)), sites.map(s => ({ label: s, data: days.map(d => by[s + '|' + d] || 0), borderColor: SCOLOR[s], backgroundColor: SCOLOR[s] })))];
+    // Totals from the daily series; position from the query report (the daily one has none).
+    const bt = tot(C.bingDaily), bq = tot(C.bingQueries), bp = tot(Pv.bingDaily), gt = tot(C.daily);
+    const share = bt.clicks / (bt.clicks + gt.clicks);
+    const dl = (a, b) => hasPrev && b ? ' <span class="note">' + delta(a, b) + '</span>' : '';
+    const sstats = `<section class="panel"><div class="sstats">
+      <div class="stat"><span class="lbl">Bing clicks</span><b>${N(bt.clicks)}</b>${dl(bt.clicks, bp.clicks)}</div>
+      <div class="stat"><span class="lbl">Bing impressions</span><b>${N(bt.impressions)}</b>${dl(bt.impressions, bp.impressions)}</div>
+      <div class="stat"><span class="lbl">Bing CTR</span><b>${P(ctr(bt))}</b></div>
+      <div class="stat"><span class="lbl">Avg position</span><b>${POS(pos(bq))}</b></div>
+      <div class="stat"><span class="lbl">Bing share of search clicks</span><b>${P(share)}</b><span class="note">Bing ÷ (Bing + Google)</span></div></div></section>`;
+    const vs = sites.map(s => {
+      const b = tot(C.bingDaily.filter(r => r.site === s)), g = tot(C.daily.filter(r => r.site === s));
+      return { k: s, bc: b.clicks, bi: b.impressions, gc: g.clicks, gi: g.impressions };
+    });
+    const vsTbl = table('bingvs', 'Google vs Bing by site', 'Clicks and impressions from each search engine', [
+      { l: 'Site', f: a => siteDot(a.k) + esc(a.k), t: a => a.k }, { l: 'Google clicks', f: a => N(a.gc) }, { l: 'Bing clicks', f: a => N(a.bc) },
+      { l: 'Bing share', f: a => P(a.bc / (a.bc + a.gc)) }, { l: 'Google impressions', f: a => N(a.gi) }, { l: 'Bing impressions', f: a => N(a.bi) },
+    ], vs);
+    const qc = gscAgg(C.bingQueries, r => r.site + '|' + r.query), qp = gscAgg(Pv.bingQueries, r => r.site + '|' + r.query);
+    const pc = gscAgg(C.bingPages, r => r.page), pp = gscAgg(Pv.bingPages, r => r.page);
+    const sortL = m => [...m.values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions);
+    const qTbl = table('bingq', 'Top Bing queries', 'What people searched on Bing', [
+      { l: 'Query', f: a => esc(a.k.split('|').slice(1).join('|')) + (st.site ? '' : ' ' + siteDot(a.k.split('|')[0])), t: a => a.k.split('|').slice(1).join('|') }, ...gscCols(hasPrev, qp)], sortL(qc), { limit: 20 });
+    const label = u => { try { const x = new URL(u); return (st.site ? '' : x.host.replace(/^www\./, '')) + x.pathname + x.search; } catch { return u; } };
+    const pTbl = table('bingp', 'Top pages on Bing', 'Pages Bing searchers clicked through to', [
+      { l: 'Page', f: a => esc(label(a.k)), t: a => a.k }, ...gscCols(hasPrev, pp)], sortL(pc), { limit: 20 });
+    return sstats + `<section class="panel"><div class="ph"><h2>${metric === 'clicks' ? 'Clicks from Bing' : 'Impressions in Bing results'} per day</h2><div class="tools">${seg('metric', [['clicks', 'Clicks'], ['impressions', 'Impressions']])}<p class="note">Bing Webmaster Tools · about 6 months of history</p></div></div><div class="chart"><canvas id="bingtrend"></canvas></div></section>`
+      + vsTbl + qTbl + pTbl;
   }
 
   // ── Landing pages ──
