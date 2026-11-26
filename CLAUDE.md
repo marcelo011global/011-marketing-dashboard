@@ -160,7 +160,27 @@ and ARPU always uses calling-package revenue. Landing pages and Reviews are sub-
 Pages import the shared modules as `./reports.js?v=…` / `./sales-data.js?v=…`. Bump the `v` in every page whenever reports.js or sales-data.js changes, or browsers can pair a new page with a stale module for up to 10 minutes (GitHub Pages cache).
 
 ### Navigation
-Top tabs: Sales · VNUMBER · Subscribers · Recharge · Globusim · Paid media. Paid media (index.html) has sub-tabs Markets (#/performance, incl. #/market/<id>) · Campaigns · Landing pages · Reviews; the review count badge sits on the Paid media tab.
+Top tabs: Sales · VNUMBER · Subscribers · Recharge · Globusim · SEO · Paid media. Paid media (index.html) has sub-tabs Markets (#/performance, incl. #/market/<id>) · Campaigns · Landing pages · Reviews; the review count badge sits on the Paid media tab.
 
 ### Paid media date ranges
 Ranges: 7/30/90 days, 6 and 12 months, this month, last month, this year, custom. The page loads two years of mkt_dailyStats (DATA_START) so 12 months has a prior period; charts switch to weekly points over ~3 months. History depth depends on the syncs: backfill() = 180 days, backfillTwoYears() = 730 days (run once in each Apps Script project). Campaigns sub-tab filters: market, campaign, status, type, name search.
+
+## SEO tab (seo.html, since 2026-11-26)
+`sync/SeoSync.gs` (own Apps Script project "SEO Sync", manifest `sync/appsscript.seo.json`, run as an account with
+read access to the three Search Console properties and the three GA4 properties) calls the Search Console API and the
+GA4 Data API with its own OAuth token (no keys) nightly at ~5am and writes monthly docs {month, cols, rows, rowCount, source:'seo-sync', syncedAt}:
+`mkt_seoDaily` [day, site, clicks, impressions, posw], `mkt_seoPages` / `mkt_seoQueries` (top 700 by clicks + top 700 by
+impressions per site per month), `mkt_seoMarkets` [site, country, device, …], `mkt_seoGa4` [day, site, channel, sessions,
+engaged, keyEvents], `mkt_seoAi` (GA4 sessions whose channel is "AI Assistant" or whose source is a known AI assistant).
+posw = position × impressions so positions re-average correctly. Sites: VNumber (GA4 463884649), 011 Global (254146485),
+GlobuSIM (351943909); Search Console properties default to sc-domain:… (override with Script property SEO_SITES).
+Also `mkt_seoLanding` [site, host, page, channel, sessions, engaged, keyEvents] (GA4 landing pages, all channels), and weekly
+snapshots in one doc each: `mkt_seoAudit/latest` (auditSync, Mon ~6am: status, noindex, title/description length, H1, images
+without alt, words + URL Inspection verdict/coverage for each site's top 40 pages and up to 20 new pages) and `mkt_seoSpeed/latest`
+(speedSync, Mon ~7am: PageSpeed Insights for top 8 pages × mobile/desktop; optional Script property PSI_API_KEY).
+`seo.js` renders sub-tabs (hash) Overview · All pages · Blog · Landing pages · Queries · Markets · New pages · Technical · Speed ·
+AI search · Paid vs organic · Alerts, with From/To month and Site filters, default the last full month vs the month before.
+Paid vs organic reads mkt_markets + mkt_dailyStats on first open (brand 'vnumber' → VNumber, else 011 Global; GlobuSIM has no ad
+account). Alerts are computed in the page (traffic drops, staging landings from AI assistants, audit and speed issues).
+Brand queries match BRAND_RE; page types come from the URL (Home, Blog, Landing = lp. hosts or /lp/ /landing/ /go/ /promo/ /offer/).
+Local preview: `seo.html?preview` reads synthetic `preview-data/mkt_seo*.json`. Bump `seo.js?v=` in seo.html when seo.js changes.

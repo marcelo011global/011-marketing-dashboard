@@ -85,3 +85,35 @@ market's Google Ads account is converted correctly.
 2. Script properties: `META_TOKEN` = the token.
 3. `META.ACCOUNTS` has Israel (584900745480085); add Brazil when known (accounts without an ID are skipped).
 4. Run `testConnection`, then `backfill`, then `installDailyTrigger` (runs ~3am).
+
+
+# Search Console + GA4 (`SeoSync.gs`) — SEO tab
+
+Feeds seo.html. Uses the Google login of whoever runs it, so no API key is stored.
+
+## 1. Access
+The account that will own the script (e.g. ai@011global.com) needs:
+- **Search Console**: a user (Restricted is enough) on the vnumber.com, 011global.com and globusim.com properties.
+- **GA4**: Viewer on properties 463884649 (VNumber), 254146485 (011 Global), 351943909 (GlobuSIM).
+
+## 2. Google Cloud project
+In `telecom-deals-f155b`, enable:
+- Google Search Console API: https://console.cloud.google.com/apis/library/searchconsole.googleapis.com?project=telecom-deals-f155b
+- Google Analytics Data API: https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com?project=telecom-deals-f155b
+- Google Analytics Admin API (only for `listAccess()`): https://console.cloud.google.com/apis/library/analyticsadmin.googleapis.com?project=telecom-deals-f155b
+- PageSpeed Insights API (for `speedSync()`): https://console.cloud.google.com/apis/library/pagespeedonline.googleapis.com?project=telecom-deals-f155b — optionally create an API key restricted to it and save it as Script property `PSI_API_KEY` (more quota).
+
+## 3. Script
+1. https://script.google.com → **New project**, name it "011 Global — SEO Sync".
+2. Paste `SeoSync.gs` into `Code.gs`; show the manifest and replace it with `appsscript.seo.json`.
+3. **Project Settings → GCP Project → Change project** → the project number (182881118188).
+4. Optional: if a Search Console property is URL-prefix rather than domain, add Script property `SEO_SITES`
+   with the full JSON list (same shape as `SEO.SITES` in the script).
+
+## 4. Run it
+1. `listAccess()` — authorize, then check the log says OK for every site.
+2. `backfill()` — last 16 months (Search Console keeps 16).
+3. `auditSync()` and `speedSync()` once by hand (Technical, New pages, Speed and part of Alerts stay empty until they run).
+4. `installDailyTrigger()` — `dailySync()` every day ~5am (this month and last), `auditSync()` Mondays ~6am, `speedSync()` Mondays ~7am.
+
+Firestore rules must let signed-in staff read the `mkt_seo*` collections (same as the other `mkt_*`).
