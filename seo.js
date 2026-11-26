@@ -161,11 +161,31 @@ function pageType(url){
   return 'Site page';
 }
 
+// Language of a page: a code in the path (/pt/, /es-mx/) or ?lang=, else guessed from the slug words.
+const LANGS = { en: 'English', es: 'Spanish', pt: 'Portuguese', he: 'Hebrew', iw: 'Hebrew', fr: 'French', de: 'German', it: 'Italian', ru: 'Russian', ar: 'Arabic' };
+const LANG_WORDS = {
+  Spanish: 'como cómo para que qué mi mis tu tus sin el los las del desde mejor mejores por una uno celular número numero llamadas recibir puedo hacer tener cuando dónde donde perder pierdo seguridad mensajes códigos codigos',
+  Portuguese: 'sem você voce seu sua do da dos das não nao uma brasileiro brasil celular número numero ligações ligacoes receber posso fazer ter quando onde perder segurança mensagens códigos chip',
+  English: 'how to the your you for with best what why get abroad number phone calls receive can do have when where lose security messages codes without and',
+};
+function langOf(url){
+  let x; try { x = new URL(url); } catch { return { lang: 'Unknown', guess: true }; }
+  const segs = x.pathname.toLowerCase().split('/').filter(Boolean);
+  const code = (segs.find(sg => /^[a-z]{2}(-[a-z]{2})?$/.test(sg) && LANGS[sg.slice(0, 2)]) || x.searchParams.get('lang') || '').slice(0, 2).toLowerCase();
+  if (LANGS[code]) return { lang: LANGS[code], guess: false };
+  const slug = decodeURIComponent(segs[segs.length - 1] || '');
+  if (/[\u0590-\u05FF]/.test(slug)) return { lang: 'Hebrew', guess: true };
+  const words = slug.split(/[-_]+/), score = {};
+  Object.entries(LANG_WORDS).forEach(([l, list]) => { const set = new Set(list.split(' ')); score[l] = words.filter(w => set.has(w)).length; });
+  const best = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  return best[0][1] > 0 && best[0][1] > best[1][1] ? { lang: best[0][0], guess: true } : { lang: 'Unknown', guess: true };
+}
+
 function start(data, getPaid){
   const keys = [...new Set(Object.values(data).flatMap(d => Object.keys(d.months || {})))].sort();
   if (!keys.length) { $('app').innerHTML = '<p class="empty">No data yet.</p>'; return; }
   const today = new Date().toISOString().slice(0, 7);
-  const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], site: '', ptype: '', brand: 'nonbrand', q: { pages: '', queries: '' }, open: {}, metric: 'clicks', strategy: 'mobile', lpOnly: 'yes', paid: null, paidErr: '', country: '', otype: '' };
+  const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], site: '', ptype: '', brand: 'nonbrand', q: { pages: '', queries: '', blog: '' }, blang: '', open: {}, metric: 'clicks', strategy: 'mobile', lpOnly: 'yes', paid: null, paidErr: '', country: '', otype: '' };
   if (st.to === today && keys.length > 1) st.from = st.to = keys[keys.length - 2];   // default: last full month
   const synced = Object.values(data).map(d => d.synced).filter(Boolean).sort().pop();
   $('srcnote').textContent = synced ? 'Synced ' + new Date(synced).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' from Search Console and GA4' : '';
@@ -455,7 +475,11 @@ function start(data, getPaid){
     const { C, Pv, hasPrev } = ctx;
     const isBlog = r => pageType(r.page) === 'Blog';
     const cur = gscAgg(C.pages.filter(isBlog), r => r.page), prev = gscAgg(Pv.pages.filter(isBlog), r => r.page);
-    const list = [...cur.values()].map(a => {
+    const all = [...cur.values()].map(a => ({ ...a, ...langOf(a.k) }));
+    const langs = [...new Set(all.map(a => a.lang))].sort((a, b) => (a === 'Unknown') - (b === 'Unknown') || a.localeCompare(b));
+    if (st.blang && !langs.includes(st.blang)) st.blang = '';
+    const q = st.q.blog.trim().toLowerCase();
+    const list = all.filter(a => (!st.blang || a.lang === st.blang) && (!q || decodeURIComponent(plabel(a.k)).toLowerCase().includes(q))).map(a => {
       const p = prev.get(a.k)?.clicks || 0, ps = pos(a), flags = [];
       if (hasPrev && p >= 10 && a.clicks < p * 0.8) flags.push(['Decaying', 'p-loss']);
       if (a.impressions >= 1000 && ctr(a) < 0.01) flags.push(['Low CTR', 'p-low']);
@@ -465,10 +489,13 @@ function start(data, getPaid){
     const has = f => list.filter(a => a.flags.some(x => x[0] === f)).length;
     const top = list.slice(0, 10);
     ctx.after = [barChart('blogtop', top.map(a => plabel(a.k)), top.map(a => a.clicks), '#EE7805')];
+    const tools = `<div class="tools">${seg('blang', [['', 'All languages'], ...langs.map(l => [l, l])])}
+      <input type="search" id="q-blog" data-q="blog" placeholder="Find a post" value="${esc(st.q.blog)}" aria-label="Find a post"></div>`;
     return stats([['Posts in Google', N(list.length)], ['Blog clicks', N(list.reduce((s, a) => s + a.clicks, 0))], ['Decaying', N(has('Decaying')), has('Decaying') > 0], ['Low CTR', N(has('Low CTR'))], ['On page 2', N(has('Page 2'))]])
       + panel('Top blog posts', 'Organic clicks', `<div class="chart" style="height:${Math.max(160, top.length * 30 + 40)}px"><canvas id="blogtop"></canvas></div>`)
-      + table('blog', 'Blog posts in Google Search', 'Decaying: clicks down over 20% vs prior period. Low CTR: under 1% on 1,000+ impressions. Page 2: position 11–20.', [
-        pcell(a => a.k, a => a.r.site), ...gscCols(hasPrev, prev), { l: 'Flags', f: a => a.flags.map(([t, c]) => pill(t, c)).join('') || '—' }], list, { limit: 25 });
+      + table('blog', 'Blog posts in Google Search', 'Language from the URL (/pt/, ?lang=); * = no code in the URL, guessed from its words. Decaying: clicks down over 20% vs prior period. Low CTR: under 1% on 1,000+ impressions. Page 2: position 11–20.', [
+        pcell(a => a.k, a => a.r.site), { l: 'Language', f: a => esc(a.lang) + (a.guess && a.lang !== 'Unknown' ? '<span class="note" title="No language code in the URL; guessed from the words in it"> *</span>' : '') },
+        ...gscCols(hasPrev, prev), { l: 'Flags', f: a => a.flags.map(([t, c]) => pill(t, c)).join('') || '—' }], list, { limit: 25, tools });
   }
 
   // ── Bing (Bing Webmaster Tools) ──
