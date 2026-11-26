@@ -13,6 +13,7 @@
  *   mkt_seoPages/{YYYY-MM}    [site, page, clicks, impressions, posw]       top pages per site
  *   mkt_seoQueries/{YYYY-MM}  [site, query, clicks, impressions, posw]      top queries per site
  *   mkt_seoMarkets/{YYYY-MM}  [site, country, device, clicks, impressions, posw]
+ *   mkt_seoPageCountry/{YYYY-MM} [site, country, page, clicks, impressions, posw]  top PER_COUNTRY pages per country per site
  *   mkt_seoGa4/{YYYY-MM}      [day, site, channel, sessions, engaged, keyEvents]
  *   mkt_seoAi/{YYYY-MM}       [site, source, host, page, sessions, engaged, keyEvents]
  *                             sessions from AI assistants (GA4 channel "AI Assistant" or a known AI source)
@@ -50,6 +51,7 @@ var SEO = {
   AUDIT_TOP: 40,     // top pages per site checked by auditSync()
   AUDIT_NEW: 20,     // new pages per site checked by auditSync()
   SPEED_TOP: 8,      // top pages per site tested by speedSync() (× mobile and desktop)
+  PER_COUNTRY: 25,   // pages kept per country per site per month (Markets → click a country)
 };
 (function () {
   var o = PropertiesService.getScriptProperties().getProperty('SEO_SITES');
@@ -110,7 +112,7 @@ function monthsBack_(n) {
 // All sites are read first; if any call fails nothing is written for that month, so
 // a doc never loses one site's rows because of a passing error.
 function syncMonth_(p) {
-  var out = { daily: [], pages: [], queries: [], markets: [], ga4: [], ai: [], landing: [] };
+  var out = { daily: [], pages: [], queries: [], markets: [], pageCountry: [], ga4: [], ai: [], landing: [] };
   SEO.SITES.forEach(function (s) {
     var gq = function (dims) { return gsc_(s.gsc, { startDate: p.from, endDate: p.to, dimensions: dims, type: 'web', dataState: 'all' }); };
     var row = function (r) { return [r.clicks || 0, r.impressions || 0, round2_((r.position || 0) * (r.impressions || 0))]; };
@@ -119,6 +121,7 @@ function syncMonth_(p) {
     top_(gq(['page'])).forEach(function (r) { out.pages.push([s.name, r.keys[0]].concat(row(r))); });
     top_(gq(['query'])).forEach(function (r) { out.queries.push([s.name, r.keys[0]].concat(row(r))); });
     gq(['country', 'device']).forEach(function (r) { out.markets.push([s.name, r.keys[0], r.keys[1]].concat(row(r))); });
+    perGroup_(gq(['country', 'page']), SEO.PER_COUNTRY).forEach(function (r) { out.pageCountry.push([s.name, r.keys[0], r.keys[1]].concat(row(r))); });
 
     var metrics = [{ name: 'sessions' }, { name: 'engagedSessions' }, { name: 'keyEvents' }];
     ga4_(s.ga4, { dateRanges: [{ startDate: p.from, endDate: p.to }], dimensions: [{ name: 'date' }, { name: 'sessionDefaultChannelGroup' }], metrics: metrics, limit: 100000 })
@@ -153,6 +156,7 @@ function syncMonth_(p) {
   put('mkt_seoPages', ['site', 'page'].concat(g), out.pages);
   put('mkt_seoQueries', ['site', 'query'].concat(g), out.queries);
   put('mkt_seoMarkets', ['site', 'country', 'device'].concat(g), out.markets);
+  put('mkt_seoPageCountry', ['site', 'country', 'page'].concat(g), out.pageCountry);
   put('mkt_seoGa4', ['day', 'site', 'channel'].concat(a), out.ga4);
   put('mkt_seoAi', ['site', 'source', 'host', 'page'].concat(a), out.ai);
   put('mkt_seoLanding', ['site', 'host', 'page', 'channel'].concat(a), out.landing);
@@ -281,6 +285,15 @@ function top_(rows) {
   var seen = {}; byC.forEach(function (r) { seen[r.keys.join('|')] = 1; });
   var byI = rows.slice().sort(function (a, b) { return b.impressions - a.impressions; }).filter(function (r) { return !seen[r.keys.join('|')]; }).slice(0, SEO.TOP);
   return byC.concat(byI);
+}
+
+// The top n rows (by clicks, then impressions) within each value of keys[0], e.g. top pages per country.
+function perGroup_(rows, n) {
+  var by = {};
+  rows.forEach(function (r) { (by[r.keys[0]] = by[r.keys[0]] || []).push(r); });
+  return Object.keys(by).reduce(function (out, k) {
+    return out.concat(by[k].sort(function (a, b) { return b.clicks - a.clicks || b.impressions - a.impressions; }).slice(0, n));
+  }, []);
 }
 
 // Keeps a doc under Firestore's size cap by dropping the rows with the fewest impressions / sessions.

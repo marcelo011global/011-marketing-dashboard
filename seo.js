@@ -6,6 +6,7 @@
 //   mkt_seoPages    [site, page, clicks, impressions, posw]          top pages of the month
 //   mkt_seoQueries  [site, query, clicks, impressions, posw]         top queries of the month
 //   mkt_seoMarkets  [site, country, device, clicks, impressions, posw]
+//   mkt_seoPageCountry [site, country, page, clicks, impressions, posw]  top 25 pages per country (Markets → click a country)
 //   mkt_seoGa4      [day, site, channel, sessions, engaged, keyEvents]  GA4 sessions by channel group
 //   mkt_seoAi       [site, source, host, page, sessions, engaged, keyEvents]  visits from AI assistants
 //   mkt_seoLanding  [site, host, page, channel, sessions, engaged, keyEvents]  GA4 landing pages, all channels
@@ -31,7 +32,7 @@ const auth = getAuth(app), db = getFirestore(app);
 const ALLOWED = ['@011global.com','@011telecom.com'];
 const allowedEmail = e => ALLOWED.some(d => (e || '').toLowerCase().endsWith(d));
 
-const COLLS = { daily: 'mkt_seoDaily', pages: 'mkt_seoPages', queries: 'mkt_seoQueries', markets: 'mkt_seoMarkets', ga4: 'mkt_seoGa4', ai: 'mkt_seoAi', landing: 'mkt_seoLanding' };
+const COLLS = { daily: 'mkt_seoDaily', pages: 'mkt_seoPages', queries: 'mkt_seoQueries', markets: 'mkt_seoMarkets', pageCountry: 'mkt_seoPageCountry', ga4: 'mkt_seoGa4', ai: 'mkt_seoAi', landing: 'mkt_seoLanding' };
 const LATEST = { audit: 'mkt_seoAudit', speed: 'mkt_seoSpeed' };
 const SITES = [{ k: 'VNumber', c: '#EE7805' }, { k: '011 Global', c: '#3A6EA5' }, { k: 'GlobuSIM', c: '#6B8E23' }];
 const SCOLOR = Object.fromEntries(SITES.map(s => [s.k, s.c]));
@@ -159,7 +160,7 @@ function start(data, getPaid){
   const keys = [...new Set(Object.values(data).flatMap(d => Object.keys(d.months || {})))].sort();
   if (!keys.length) { $('app').innerHTML = '<p class="empty">No data yet.</p>'; return; }
   const today = new Date().toISOString().slice(0, 7);
-  const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], site: '', ptype: '', brand: 'nonbrand', q: { pages: '', queries: '' }, open: {}, metric: 'clicks', strategy: 'mobile', lpOnly: 'yes', paid: null, paidErr: '' };
+  const st = { from: keys[keys.length - 1], to: keys[keys.length - 1], site: '', ptype: '', brand: 'nonbrand', q: { pages: '', queries: '' }, open: {}, metric: 'clicks', strategy: 'mobile', lpOnly: 'yes', paid: null, paidErr: '', country: '' };
   if (st.to === today && keys.length > 1) st.from = st.to = keys[keys.length - 2];   // default: last full month
   const synced = Object.values(data).map(d => d.synced).filter(Boolean).sort().pop();
   $('srcnote').textContent = synced ? 'Synced ' + new Date(synced).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' from Search Console and GA4' : '';
@@ -220,6 +221,10 @@ function start(data, getPaid){
     $('body').querySelectorAll('[data-seg]').forEach(b => b.onclick = () => { st[b.dataset.seg] = b.dataset.val; render(); });
     $('body').querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = '#/' + b.dataset.go; });
     $('body').querySelectorAll('input[data-q]').forEach(inp => inp.oninput = () => { st.q[inp.dataset.q] = inp.value; render(inp.id); });
+    $('body').querySelectorAll('[data-country]').forEach(b => b.onclick = () => {
+      st.country = st.country === b.dataset.country ? '' : b.dataset.country; render();
+      if (st.country) $('cpages')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     $('body').querySelectorAll('[data-find]').forEach(li => li.onclick = () => { st.q.pages = li.dataset.find; render(); });
     ctx.after && ctx.after.forEach(f => f());
     if (focusId) { const el = $(focusId); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
@@ -356,7 +361,26 @@ function start(data, getPaid){
     const sort = m => [...m.values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions);
     const cname = c => COUNTRY[c] || String(c).toUpperCase();
     const dname = d => ({ DESKTOP: 'Desktop', MOBILE: 'Mobile', TABLET: 'Tablet' }[d] || d);
-    return `${table('countries', 'By country', cc.size + ' countries · where searchers are', [{ l: 'Country', f: a => esc(cname(a.k)), t: a => cname(a.k) }, ...gscCols(hasPrev, cp), share], sort(cc), { limit: 15 })}
+    // Click a country → the pages its searchers landed on (Search Console page × country, top 25 per country per site).
+    const ckey = c => String(c).toLowerCase();
+    const countryCell = a => `<button type="button" class="linkbtn${ckey(a.k) === st.country ? ' on' : ''}" data-country="${esc(ckey(a.k))}" aria-expanded="${ckey(a.k) === st.country}">${esc(cname(a.k))}</button>`;
+    let detail = '';
+    if (st.country) {
+      const rows = C.pageCountry.filter(r => ckey(r.country) === st.country);
+      const pc = gscAgg(rows, r => r.page), pp = gscAgg(Pv.pageCountry.filter(r => ckey(r.country) === st.country), r => r.page);
+      const label = u => { try { const x = new URL(u); return (st.site ? '' : x.host.replace(/^www\./, '')) + x.pathname + x.search; } catch { return u; } };
+      const list = [...pc.values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions);
+      const ct = tot(rows);
+      const note = !data.pageCountry || !Object.keys(data.pageCountry.months).length
+        ? 'No page-by-country data yet: run backfill() in the SEO Sync script once to load it'
+        : 'Pages Google searchers in ' + cname(st.country) + ' clicked through to · top 25 pages per site per month';
+      detail = `<div id="cpages">${table('cpages', 'Pages visited from ' + cname(st.country), note, [
+        { l: 'Page', f: a => esc(label(a.k)), t: a => a.k }, { l: 'Type', f: a => esc(pageType(a.k) === 'Site page' ? 'Other' : pageType(a.k)) },
+        ...gscCols(hasPrev, pp), { l: 'Share of country clicks', f: a => P(a.clicks / ct.clicks) },
+      ], list, { limit: 25, wide: true, tools: '<div class="tools"><button type="button" class="more" data-country="' + esc(st.country) + '">Close</button></div>' })}</div>`;
+    }
+    return `${table('countries', 'By country', cc.size + ' countries · where searchers are · click a country to see its pages', [{ l: 'Country', f: countryCell, t: a => cname(a.k) }, ...gscCols(hasPrev, cp), share], sort(cc), { limit: 15 })}
+      ${detail}
       ${table('devices', 'By device', 'Search Console', [{ l: 'Device', f: a => esc(dname(a.k)) }, ...gscCols(hasPrev, dp), share], sort(dc))}`;
   }
 
