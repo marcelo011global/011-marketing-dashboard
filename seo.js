@@ -177,9 +177,13 @@ function start(data, getPaid){
   $('filters').innerHTML =
     `<div class="f"><label for="from">From</label><select id="from">${keys.map(k => opt(k, monthName(k), k === st.from)).join('')}</select></div>
      <div class="f"><label for="to">To</label><select id="to">${keys.map(k => opt(k, monthName(k) + (k === today ? ' (so far)' : ''), k === st.to)).join('')}</select></div>
-     <div class="f"><span class="lbl">Site</span><div class="seg" role="group" id="site">${[['', 'All sites'], ...SITES.map(s => [s.k, s.k])].map(([v, l]) => `<button type="button" data-site="${esc(v)}" aria-pressed="${st.site === v}">${esc(l)}</button>`).join('')}</div></div>`;
+     <div class="f"><span class="lbl">Site</span><div class="seg" role="group" id="site">${[['', 'All sites'], ...SITES.map(s => [s.k, s.k])].map(([v, l]) => `<button type="button" data-site="${esc(v)}" aria-pressed="${st.site === v}">${esc(l)}</button>`).join('')}</div></div>
+     <div class="f" id="otype-f" hidden><span class="lbl">Pages</span><div class="seg" role="group" id="otype" title="Organic figures for these pages only (GA4 counted by landing page)">${[['', 'All pages'], ['Home', 'Home'], ['Blog', 'Blog'], ['Landing', 'Landing'], ['Site page', 'Other']].map(([v, l]) => `<button type="button" data-otype="${v}" aria-pressed="${st.otype === v}">${l}</button>`).join('')}</div></div>`;
   $('from').onchange = e => { st.from = e.target.value; if (st.from > st.to) { st.to = st.from; $('to').value = st.to; } render(); };
   $('to').onchange = e => { st.to = e.target.value; if (st.to < st.from) { st.from = st.to; $('from').value = st.from; } render(); };
+  $('otype').querySelectorAll('button').forEach(b => b.onclick = () => {
+    st.otype = b.dataset.otype; $('otype').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); render();
+  });
   $('site').querySelectorAll('button').forEach(b => b.onclick = () => {
     st.site = b.dataset.site; $('site').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); render();
   });
@@ -197,6 +201,7 @@ function start(data, getPaid){
     const C = {}, Pv = {};
     Object.keys(COLLS).forEach(name => { C[name] = rowsOf(name, inRange); Pv[name] = rowsOf(name, prevKeys); });
     // Overview "Pages" filter: swap in the per-page-type series so the KPIs, chart and site table all follow it.
+    $('otype-f').hidden = v !== 'overview';
     const hasType = Object.keys(data.dailyType?.months || {}).length > 0, ftype = v === 'overview' && st.otype && hasType ? st.otype : '';
     if (ftype) [C, Pv].forEach(X => {
       X.daily = X.dailyType.filter(r => r.type === ftype);
@@ -301,8 +306,7 @@ function start(data, getPaid){
 
     const typeAgg = gscAgg(C.pages, r => pageType(r.page)), typeAll = tot(C.pages);
     const types = `<section class="panel"><div class="ph"><h2>Clicks by page type</h2><p class="note">Which kinds of pages bring organic traffic</p></div><div class="sstats">${['Home', 'Landing', 'Blog', 'Site page'].map(t => { const a = typeAgg.get(t) || { clicks: 0 }; return `<div class="stat"><span class="lbl">${t === 'Site page' ? 'Other pages' : t}</span><b>${N(a.clicks)}</b><span class="note">${P(a.clicks / typeAll.clicks)} of clicks</span></div>`; }).join('')}</div></section>`;
-    const pf = `<div class="tools ofilter"><span class="lbl">Pages</span>${seg('otype', [['', 'All pages'], ['Home', 'Home'], ['Blog', 'Blog'], ['Landing', 'Landing'], ['Site page', 'Other']])}${!ctx.hasType ? '<p class="note">Page-type figures appear after the next SEO Sync backfill()</p>' : ctx.ftype ? '<p class="note">Organic figures for these pages only · GA4 by landing page</p>' : ''}</div>`;
-    return pf + `<section class="panel"><div class="ph"><h2>${({ clicks: 'Clicks from Google', impressions: 'Impressions in Google results', conversions: 'Conversions from organic search' })[st.metric]} per day</h2><div class="tools">${seg('metric', [['clicks', 'Clicks'], ['impressions', 'Impressions'], ['conversions', 'Conversions']])}<p class="note">${conv ? 'GA4 key events from Organic Search sessions · lags about 1 day' : 'Search Console · data lags about 2 days'}</p></div></div><div class="chart"><canvas id="trend"></canvas></div></section>${types}
+    return `<section class="panel"><div class="ph"><h2>${({ clicks: 'Clicks from Google', impressions: 'Impressions in Google results', conversions: 'Conversions from organic search' })[st.metric]} per day</h2><div class="tools">${seg('metric', [['clicks', 'Clicks'], ['impressions', 'Impressions'], ['conversions', 'Conversions']])}<p class="note">${conv ? 'GA4 key events from Organic Search sessions · lags about 1 day' : 'Search Console · data lags about 2 days'}</p></div></div><div class="chart"><canvas id="trend"></canvas></div></section>${types}
       ${siteTbl}${ctx.ftype ? '' : chTbl}`;
   }
 
