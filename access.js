@@ -59,7 +59,12 @@ export const firstHref = acc => { const p = PAGES.find(p => acc.pages.has(p.k));
 // Hide top-bar links the person cannot open; admins also get a "Users" link.
 export function applyNav(acc){
   const links = [...document.querySelectorAll('a.nav-btn')];
-  links.forEach(a => { const k = pageOfFile(fileOf(a.getAttribute('href'))); if (k && !acc.pages.has(k)) a.style.display = 'none'; });
+  links.forEach(a => { const k = pageOfFile(fileOf(a.getAttribute('href'))); a.style.display = k && !acc.pages.has(k) ? 'none' : ''; });
+  // Remember the hidden links so the next page hides them before it is drawn (inline script in each page's <head>).
+  const hide = PAGES.filter(p => !acc.pages.has(p.k)).flatMap(p => p.k === 'paid' ? ['a.nav-btn[href^="index.html"]', 'a.nav-btn[href^="#/"]'] : p.files.map(f => `a.nav-btn[href="${f}"]`));
+  try { localStorage.setItem('mkt_navHide', JSON.stringify(hide)); } catch {}
+  document.getElementById('nav-pre')?.remove();
+  document.documentElement.classList.remove('nav-wait');
   document.querySelectorAll('a.logo').forEach(a => { if (!acc.pages.has('paid')) { const h = firstHref(acc); if (h) a.setAttribute('href', h); } });
   if (acc.admin && links.length && !document.getElementById('nav-users')) {
     const u = document.createElement('a');

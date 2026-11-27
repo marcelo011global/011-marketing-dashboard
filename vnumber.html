@@ -22,6 +22,9 @@ td.l{text-align:left;font-family:var(--body)}
 .monthly tbody tr:first-child td{font-weight:500}
 .mtbl{max-height:520px;overflow:auto}
 </style>
+<script>/* access.js: apply the remembered menu before first paint (no flash of links this person can't open) */
+try{var h=JSON.parse(localStorage.getItem('mkt_navHide')||'null');if(h){if(h.length)document.write('<style id="nav-pre">'+h.join(',')+'{display:none!important}</style>')}else document.documentElement.classList.add('nav-wait')}catch(e){}</script>
+<style>html.nav-wait a.nav-btn{visibility:hidden}</style>
 </head>
 <body>
 
@@ -336,7 +339,7 @@ render();
 };
 </script>
 <script type="module">
-import { initPage } from './sales-data.js?v=202611271116';
+import { initPage } from './sales-data.js?v=202611271127';
 initPage({
   title: 'VNUMBER',
   emptyText: 'No VNUMBER data has been uploaded yet. Upload the monthly Package Profitability workbook (.xlsx). This page uses its “Vnumber Summary” and “LTV” tabs and the VNUMBER packages in the main tab.',

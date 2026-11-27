@@ -7,6 +7,9 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="sales.css">
 <style>tfoot td{border-top:2px solid var(--line-strong);border-bottom:0} .more{justify-self:start} #tables{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr));gap:20px}</style>
+<script>/* access.js: apply the remembered menu before first paint (no flash of links this person can't open) */
+try{var h=JSON.parse(localStorage.getItem('mkt_navHide')||'null');if(h){if(h.length)document.write('<style id="nav-pre">'+h.join(',')+'{display:none!important}</style>')}else document.documentElement.classList.add('nav-wait')}catch(e){}</script>
+<style>html.nav-wait a.nav-btn{visibility:hidden}</style>
 </head>
 <body>
 
@@ -61,7 +64,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="report-pdf.js"></script>
 <script type="module">
-import { initReport } from './reports.js?v=202611271116';
+import { initReport } from './reports.js?v=202611271127';
 initReport({
   title: 'VNUMBER enrollments', coll: 'mkt_vnEnroll',
   // Same status groups and colors as the Subscribers page: Active = Active + Sleeping; Not active = everything else.
