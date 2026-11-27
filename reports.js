@@ -12,6 +12,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { guard, can } from './access.js?v=202611271116';
 
 const app = initializeApp({
   apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
@@ -75,8 +76,8 @@ export function initReport(cfg){
   $('signout').onclick = async () => { await signOut(auth); location.href = 'index.html'; };
   if (LOCAL_PREVIEW) {
     $('user-display').textContent = 'Local preview';
-    Promise.all([fetch(`preview-data/${cfg.coll}.json`).then(r => r.json()), cfg.packageTypes ? fetch('preview-data/mkt_sales.json').then(r => r.json()).catch(() => null) : null])
-      .then(([d, s]) => { $('gate').hidden = true; $('app').hidden = false; start(cfg, d, { pkgType: pkgTypes(s?.months) }); });
+    guard(null, null, () => { location.search = ''; }).then(acc => acc && Promise.all([fetch(`preview-data/${cfg.coll}.json`).then(r => r.json()), cfg.packageTypes ? fetch('preview-data/mkt_sales.json').then(r => r.json()).catch(() => null) : null])
+      .then(([d, s]) => { $('gate').hidden = true; $('app').hidden = false; start(cfg, d, { pkgType: pkgTypes(s?.months) }); }));
     return;
   }
   onAuthStateChanged(auth, async user => {
@@ -86,8 +87,11 @@ export function initReport(cfg){
     }
     $('user-display').textContent = user.displayName || user.email;
     gate('<p>Loading…</p>');
+    const acc = await guard(db, user, async () => { await signOut(auth); location.href = 'index.html'; });
+    if (!acc) return;
     try {
-      const [data, pkgType] = await Promise.all([load(cfg.coll), cfg.packageTypes ? loadPkgTypes().catch(e => { console.error(e); return new Map(); }) : null]);
+      // Package types come from the Sales report, readable only with Sales or VNUMBER access.
+      const [data, pkgType] = await Promise.all([load(cfg.coll), cfg.packageTypes && (can(acc, 'sales') || can(acc, 'vnumber')) ? loadPkgTypes().catch(e => { console.error(e); return new Map(); }) : null]);
       if (!Object.keys(data.months).length) { gate(`<h1>${esc(cfg.title)}</h1><p>No data yet. It arrives from the nightly Reports API sync.</p>`); return; }
       $('gate').hidden = true; $('app').hidden = false;
       start(cfg, data, { pkgType: pkgType || new Map() });

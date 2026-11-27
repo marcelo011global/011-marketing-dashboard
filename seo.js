@@ -24,6 +24,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, doc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { guard, can } from './access.js?v=202611271116';
 
 const app = initializeApp({
   apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
@@ -43,7 +44,7 @@ const COLLS = { daily: 'mkt_seoDaily', pages: 'mkt_seoPages', queries: 'mkt_seoQ
 const LATEST = { audit: 'mkt_seoAudit', speed: 'mkt_seoSpeed' };
 const SITES = [{ k: 'VNumber', c: '#EE7805' }, { k: '011 Global', c: '#3A6EA5' }, { k: 'GlobuSIM', c: '#6B8E23' }];
 const SCOLOR = Object.fromEntries(SITES.map(s => [s.k, s.c]));
-const VIEWS = [['overview', 'Overview'], ['pages', 'All pages'], ['blog', 'Blog'], ['landing', 'Landing pages'], ['queries', 'Queries'], ['markets', 'Markets'],
+let VIEWS = [['overview', 'Overview'], ['pages', 'All pages'], ['blog', 'Blog'], ['landing', 'Landing pages'], ['queries', 'Queries'], ['markets', 'Markets'],
   ['new', 'New pages'], ['technical', 'Technical'], ['speed', 'Speed'], ['ai', 'AI search'], ['bing', 'Bing'], ['sales', 'SEO sales'], ['paid', 'Paid vs organic'], ['alerts', 'Alerts']];
 const FOCUS = new Set(['usa', 'can', 'bra', 'isr', 'gbr', 'nld', 'mex', 'arg', 'ury', 'col']);   // diaspora focus markets
 const BRAND_RE = /v\s?numbers?|\b011\b|zero eleven|globu\s?sim/i;
@@ -93,7 +94,7 @@ async function loadLatest(coll){
 }
 async function loadAll(get, getLatest){
   const names = Object.keys(COLLS), lnames = Object.keys(LATEST);
-  const [got, lat] = await Promise.all([Promise.all(names.map(n => get(COLLS[n]))), Promise.all(lnames.map(n => getLatest(LATEST[n]).catch(e => { console.warn(n, e); return { rows: [], synced: null }; })))]);
+  const [got, lat] = await Promise.all([Promise.all(names.map(n => n === 'vnEnroll' ? get(COLLS[n]).catch(() => ({ months: {}, synced: null })) : get(COLLS[n]))), Promise.all(lnames.map(n => getLatest(LATEST[n]).catch(e => { console.warn(n, e); return { rows: [], synced: null }; })))]);
   const out = Object.fromEntries(names.map((n, i) => [n, got[i]]));
   lnames.forEach((n, i) => out[n] = lat[i]);
   return out;
@@ -113,11 +114,19 @@ function paidRows(p){
 // Local-only preview (?preview on localhost): no sign-in; reads gitignored preview-data/<coll>.json.
 const LOCAL_PREVIEW = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('preview');
 
-export function initSeo(){
+// "SEO sales" reads VNUMBER enrollments and "Paid vs organic" reads ad spend: shown only with that access.
+function limitViews(acc){
+  VIEWS = VIEWS.filter(([v]) => !(v === 'sales' && !can(acc, 'vnumber')) && !(v === 'paid' && !can(acc, 'paid')));
+}
+
+export async function initSeo(){
   const gate = html => { $('app').hidden = true; const g = $('gate'); g.hidden = false; g.innerHTML = html; };
   $('signout').onclick = async () => { await signOut(auth); location.href = 'index.html'; };
   if (LOCAL_PREVIEW) {
     $('user-display').textContent = 'Local preview';
+    const pacc = await guard(null, null, () => { location.search = ''; });
+    if (!pacc) return;
+    limitViews(pacc);
     const pf = (c, empty) => fetch(`preview-data/${c}.json`).then(r => r.json()).catch(() => empty);
     loadAll(c => pf(c, { months: {} }), c => pf(c, { rows: [] }))
       .then(d => { $('gate').hidden = true; $('app').hidden = false; start(d, () => pf('seo_paid', { markets: [], stats: [] })); });
@@ -130,6 +139,9 @@ export function initSeo(){
     }
     $('user-display').textContent = user.displayName || user.email;
     gate('<p>Loading…</p>');
+    const acc = await guard(db, user, async () => { await signOut(auth); location.href = 'index.html'; });
+    if (!acc) return;
+    limitViews(acc);
     try {
       const data = await loadAll(load, loadLatest);
       if (!Object.keys(data.daily.months).length) { gate('<h1>SEO</h1><p>No data yet. It arrives from the nightly Search Console and GA4 sync (sync/SeoSync.gs).</p>'); return; }

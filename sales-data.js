@@ -8,6 +8,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDocs, getDoc, writeBatch, serverTimestamp, setDoc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { guard } from './access.js?v=202611271116';
 
 const app = initializeApp({
   apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
@@ -210,6 +211,7 @@ export function initPage(opts){
 
   if (LOCAL_PREVIEW) {
     $('user-display').textContent = 'Local preview';
+    guard(null, null, () => { location.search = ''; });
     fetch('test-report.xlsx').then(r => r.ok ? r.arrayBuffer() : null)
       .then(async b => {
         const p = b ? parseWorkbook(b) : {};
@@ -225,6 +227,7 @@ export function initPage(opts){
     if (!user || !allowedEmail(user.email)) { gate(`<h1>Sign in to continue</h1><p>${opts.title} figures are for 011 Global and 011 Telecom staff. Sign in on the marketing dashboard, then come back here.</p><a class="btn primary" href="index.html">Go to sign in</a>`); return; }
     $('user-display').textContent = user.displayName || user.email;
     gate('<p>Loading…</p>');
+    if (!await guard(db, user, async () => { await signOut(auth); location.href = 'index.html'; })) return;
     try { current = await loadAll(opts.load || {}); show(current); }
     catch (e) {
       console.error(e);

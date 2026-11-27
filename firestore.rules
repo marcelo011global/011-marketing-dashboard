@@ -1,0 +1,56 @@
+// Marketing dashboard (mkt_*) access rules: the half of access.js that actually protects data.
+// Firestore has ONE rules file for the whole project (deals.011telecom.com shares it), so this
+// block is merged into the project's rules in the Firebase console, next to the deals rules.
+// Any existing catch-all (match /{document=**}) must skip mkt_* collections, or it would
+// re-open them to every signed-in user: rules are OR-ed, the most permissive match wins.
+//
+// mkt_access/{email lowercase} = { role: 'admin' | 'marketing' | 'seo' | 'finance' | 'custom', pages: [...] }
+// Page keys: sales, vnumber, subscribers, recharge, globusim, seo, paid (see access.js PAGES).
+// The Apps Script syncs write with Google OAuth (IAM), which bypasses these rules.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Marketing dashboard ──
+    function mktSignedIn() { return request.auth != null && request.auth.token.email is string; }
+    function mktMe() { return request.auth.token.email.lower(); }
+    function mktAccPath() { return /databases/$(database)/documents/mkt_access/$(mktMe()); }
+    function mktAcc() { return get(mktAccPath()).data; }
+    function mktHas() { return mktSignedIn() && exists(mktAccPath()); }
+    function mktAdmin() { return mktHas() && mktAcc().role == 'admin'; }
+    function mktCan(pages) { return mktHas() && (mktAcc().role == 'admin' || mktAcc().pages.hasAny(pages)); }
+
+    // Who can see what: each person reads their own entry; admins manage everyone (users.html).
+    match /mkt_access/{email} {
+      allow read: if mktSignedIn() && (email == mktMe() || mktAdmin());
+      allow write: if mktAdmin();
+    }
+
+    // Sales + VNUMBER (Package Profitability upload writes these from the browser)
+    match /mkt_sales/{d}     { allow read, write: if mktCan(['sales', 'vnumber']); }
+    match /mkt_salesMeta/{d} { allow read, write: if mktCan(['sales', 'vnumber']); }
+    match /mkt_vnumber/{d}   { allow read, write: if mktCan(['sales', 'vnumber']); }
+    // Reports API sync (read only from the browser). Sales and VNUMBER include SIM and recharge revenue.
+    match /mkt_vnEnroll/{d}  { allow read: if mktCan(['vnumber']); }
+    match /mkt_subs/{d}      { allow read: if mktCan(['subscribers']); }
+    match /mkt_mr/{d}        { allow read: if mktCan(['recharge', 'sales', 'vnumber']); }
+    match /mkt_sims/{d}      { allow read: if mktCan(['globusim', 'sales', 'vnumber']); }
+    // SEO sync: every mkt_seo* collection
+    match /{coll}/{d} {
+      allow read: if coll.matches('mkt_seo.*') && mktCan(['seo']);
+    }
+    // Paid media. Ad spend (markets + daily stats) is also read by VNUMBER for CPA.
+    match /mkt_markets/{d}         { allow read: if mktCan(['paid', 'vnumber']); }
+    match /mkt_dailyStats/{d}      { allow read: if mktCan(['paid', 'vnumber']); }
+    match /mkt_campaigns/{d}       { allow read: if mktCan(['paid']); }
+    match /mkt_reviews/{d}         { allow read: if mktCan(['paid']); }
+    match /mkt_landingPages/{d}    { allow read, write: if mktCan(['paid']); }
+    match /mkt_proposals/{d}       { allow read, write: if mktCan(['paid']); }
+    match /mkt_activity/{d}        { allow read, write: if mktCan(['paid']); }
+    match /mkt_sampleDecisions/{d} { allow read, write: if mktCan(['paid']); }
+    match /mkt_sampleActivity/{d}  { allow read, write: if mktCan(['paid']); }
+
+    // ── Deals dashboard and everything else: the project's existing rules go here ──
+    // (merged in the console; a catch-all must add: && !coll.matches('mkt_.*'))
+  }
+}

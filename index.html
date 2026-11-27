@@ -317,6 +317,7 @@ h1 .bchip{font-size:12px;vertical-align:4px;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut as fbSignOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, writeBatch, query, orderBy, onSnapshot, serverTimestamp, getDocs, where, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { guard } from './access.js?v=202611271116';
 
 // Same Firebase project as the deals dashboard — one login for both sites.
 // Marketing data lives in its own `mkt_*` collections (see CLAUDE.md).
@@ -407,12 +408,17 @@ function enterApp(user){
 
 // Deferred so every const/helper below is initialized before the app starts.
 queueMicrotask(() => {
+  // Paid media is this page: people without it are forwarded to their first page (see access.js).
+  const out = async () => { if (LOCAL_PREVIEW) { location.search = ''; return; } await fbSignOut(auth); location.reload(); };
   if (LOCAL_PREVIEW) {
-    enterApp({ displayName: 'Local preview', email: 'preview@localhost' });
+    guard(null, null, out).then(acc => acc && enterApp({ displayName: 'Local preview', email: 'preview@localhost' }));
     return;
   }
-  onAuthStateChanged(auth, user => {
-    if (user && allowedEmail(user.email)) enterApp(user);
+  onAuthStateChanged(auth, async user => {
+    if (user && allowedEmail(user.email)) {
+      document.getElementById('auth-screen').style.display = 'none';
+      if (await guard(db, user, out)) enterApp(user);
+    }
     else {
       S.user = null;
       document.getElementById('app-screen').style.display = 'none';

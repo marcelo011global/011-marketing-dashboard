@@ -184,3 +184,17 @@ Paid vs organic reads mkt_markets + mkt_dailyStats on first open (brand 'vnumber
 account). Alerts are computed in the page (traffic drops, staging landings from AI assistants, audit and speed issues).
 Brand queries match BRAND_RE; page types come from the URL (Home, Blog, Landing = lp. hosts or /lp/ /landing/ /go/ /promo/ /offer/).
 Local preview: `seo.html?preview` reads synthetic `preview-data/mkt_seo*.json`. Bump `seo.js?v=` in seo.html when seo.js changes.
+
+## Access (who sees which page)
+- `access.js` (shared by every page): `mkt_access/{email lowercase}` = {email, role, pages, updatedBy, updatedAt}.
+  Page keys: sales, vnumber (also enrollments.html), subscribers, recharge, globusim (sims.html), seo, paid (index.html).
+  Roles: admin (every page + **Users** page), marketing (paid, seo), seo (SEO agency: seo), finance
+  (sales, vnumber, subscribers, recharge, globusim), custom (ticked pages). No entry = no access.
+- `users.html`: admin-only page to add/edit/remove people. The first person in, while `mkt_access` is
+  empty and the rules are not published, gets a "Make me admin" button.
+- Pages hide top-bar links the person can't open and block direct visits; index.html (sign-in) forwards
+  people without Paid media to their first page. SEO hides "SEO sales" (needs vnumber) and
+  "Paid vs organic" (needs paid). Subscribers skips package types without sales/vnumber.
+- `firestore.rules`: the same access enforced on the data. Merged by hand into the project's rules in the
+  Firebase console (the deals dashboard shares them); never let a catch-all match mkt_*.
+- Local preview: `?preview&role=seo` or `?preview&pages=seo,paid` shows what that person would see.

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>011 Global — Users</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="sales.css">
+<style>
+.form{display:grid;gap:14px}
+.form .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+.form input[type=email]{min-width:min(100%,300px);padding:8px 10px;border:1px solid var(--line-strong,#D6D3D1);border-radius:8px;font:inherit}
+.pages{display:flex;gap:8px;flex-wrap:wrap}
+.pages label{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--line-strong,#D6D3D1);border-radius:8px;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:normal;font-weight:500;color:inherit}
+#roles{flex-wrap:wrap;max-width:100%} #roles button{white-space:nowrap}
+.pages label:has(input:checked){background:#FDF0E6;border-color:#EE7805;color:#C25E00;font-weight:600}
+.pages input:disabled + span{opacity:.7}
+.tags{display:flex;gap:4px;flex-wrap:wrap}
+.tag{font-size:12px;padding:2px 8px;border-radius:999px;background:#F5F5F4;color:#44403C}
+.tag.adm{background:#FDF0E6;color:#C25E00;font-weight:600}
+td .acts{display:flex;gap:6px;justify-content:flex-end}
+.msg{color:#B42318;font-size:13px;min-height:1em;margin:0}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <a class="logo" href="index.html#/performance"><img src="logo.png" alt="011 Global" class="logo-img"></a>
+    <span class="app-name">Marketing</span>
+    <a class="nav-btn" href="sales.html">Sales</a>
+    <a class="nav-btn" href="vnumber.html">VNUMBER</a>
+    <a class="nav-btn" href="subscribers.html">Subscribers</a>
+    <a class="nav-btn" href="recharge.html">Recharge</a>
+    <a class="nav-btn" href="sims.html">Globusim</a>
+    <a class="nav-btn" href="seo.html">SEO</a>
+    <a class="nav-btn" href="index.html#/performance">Paid media</a>
+  </div>
+  <div class="topbar-right">
+    <span class="user" id="user-display"></span>
+    <button class="btn ghost" type="button" id="signout">Sign out</button>
+  </div>
+</header>
+
+<div class="gate" id="gate"><p>Loading…</p></div>
+
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div>
+      <div class="brand"><i></i>011 Global · Users</div>
+      <h1>Who can see what</h1>
+      <p class="sub">People see only the pages ticked for them. Anyone not on this list can't open the dashboard. Accounts are still created on deals.011telecom.com (company emails only).</p>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="ph"><h2 id="ftitle">Add a person</h2><p class="note">Pick a role to tick its pages, then adjust if needed</p></div>
+    <form class="form" id="form" autocomplete="off">
+      <div class="row">
+        <div class="f"><label for="email">Email</label><input type="email" id="email" required placeholder="name@011global.com"></div>
+        <div class="f"><span class="lbl">Role</span><div class="seg" role="group" id="roles"></div></div>
+      </div>
+      <div class="f"><span class="lbl">Pages</span><div class="pages" id="pages"></div></div>
+      <p class="msg" id="msg" role="alert"></p>
+      <div class="row"><button class="btn primary" type="submit" id="save">Save</button><button class="btn ghost" type="button" id="cancel" hidden>Cancel</button></div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="ph"><h2>People with access</h2><p class="note" id="count"></p></div>
+    <div class="tbl"><table><thead><tr><th>Email</th><th>Role</th><th>Pages</th><th>Last changed</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+</div>
+
+<div id="toast" hidden></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { guard, PAGES, ROLES, emailKey } from './access.js?v=202611271116';
+
+const app = initializeApp({
+  apiKey: "AIzaSyBVS3csw3_p9T_E_wnEXMhyA6EkPE9VtRY",
+  authDomain: "telecom-deals-f155b.firebaseapp.com",
+  projectId: "telecom-deals-f155b",
+  storageBucket: "telecom-deals-f155b.firebasestorage.app",
+  messagingSenderId: "182881118188",
+  appId: "1:182881118188:web:9d2f09995f7a1393f942c9"
+});
+const auth = getAuth(app), db = getFirestore(app);
+const ALLOWED = ['@011global.com','@011telecom.com'];
+const allowedEmail = e => ALLOWED.some(d => emailKey(e).endsWith(d));
+const LOCAL_PREVIEW = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('preview');
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+let toastT;
+const toast = m => { const el = $('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 5000); };
+const when = t => { const d = t?.toDate ? t.toDate() : t ? new Date(t) : null; return d ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; };
+
+let me = null, people = [], editing = null, role = 'marketing';
+const sorted = () => people.slice().sort((a, b) => (b.role === 'admin') - (a.role === 'admin') || a.email.localeCompare(b.email));
+const memStore = [];   // local preview only
+
+// ── Form ──
+$('roles').innerHTML = Object.entries(ROLES).map(([k, r]) => `<button type="button" data-role="${k}" title="${esc(r.note || r.pages.map(p => PAGES.find(x => x.k === p).l).join(', ') || 'Tick pages one by one')}">${esc(r.l)}</button>`).join('');
+$('pages').innerHTML = PAGES.map(p => `<label><input type="checkbox" value="${p.k}"><span>${esc(p.l)}</span></label>`).join('');
+const boxes = () => [...$('pages').querySelectorAll('input')];
+function setRole(k, tick = true){
+  role = k;
+  $('roles').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.role === k));
+  if (tick && k !== 'custom') boxes().forEach(b => b.checked = ROLES[k].pages.includes(b.value));
+  boxes().forEach(b => b.disabled = k === 'admin');
+}
+// Ticking boxes by hand: match a preset if it lines up, otherwise Custom.
+const matchRole = ps => Object.entries(ROLES).find(([k, r]) => k !== 'admin' && k !== 'custom' && r.pages.length === ps.length && r.pages.every(p => ps.includes(p)))?.[0] || 'custom';
+$('roles').onclick = e => { const b = e.target.closest('button'); if (b) setRole(b.dataset.role); };
+$('pages').onchange = () => setRole(matchRole(boxes().filter(b => b.checked).map(b => b.value)), false);
+
+function resetForm(){
+  editing = null; $('form').reset(); $('email').disabled = false; $('msg').textContent = '';
+  $('ftitle').textContent = 'Add a person'; $('cancel').hidden = true; setRole('marketing');
+}
+function edit(email){
+  const p = people.find(x => x.email === email); if (!p) return;
+  editing = email; $('email').value = email; $('email').disabled = true; $('msg').textContent = '';
+  $('ftitle').textContent = 'Edit ' + email; $('cancel').hidden = false;
+  boxes().forEach(b => b.checked = (p.pages || []).includes(b.value));
+  setRole(ROLES[p.role] ? p.role : 'custom', false);
+  if (p.role === 'admin') setRole('admin');
+  $('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('cancel').onclick = resetForm;
+
+$('form').onsubmit = async e => {
+  e.preventDefault();
+  const email = emailKey(editing || $('email').value);
+  const pages = role === 'admin' ? [] : boxes().filter(b => b.checked).map(b => b.value);
+  if (!allowedEmail(email)) { $('msg').textContent = 'Only @011global.com and @011telecom.com addresses can sign in.'; return; }
+  if (!editing && people.some(p => p.email === email)) { $('msg').textContent = email + ' is already on the list. Use Edit.'; return; }
+  if (role !== 'admin' && !pages.length) { $('msg').textContent = 'Tick at least one page, or remove the person instead.'; return; }
+  if (email === emailKey(me.email) && role !== 'admin') { $('msg').textContent = "You can't take admin away from yourself. Ask another admin."; return; }
+  const rec = { email, role, pages, updatedBy: me.email, updatedAt: LOCAL_PREVIEW ? new Date() : serverTimestamp() };
+  $('save').disabled = true;
+  try {
+    if (LOCAL_PREVIEW) { const i = memStore.findIndex(x => x.email === email); i >= 0 ? memStore[i] = rec : memStore.push(rec); }
+    else await setDoc(doc(db, 'mkt_access', email), rec);
+    toast((editing ? 'Updated ' : 'Added ') + email);
+    resetForm(); await refresh();
+  } catch (err) { $('msg').textContent = 'Could not save: ' + err.message; }
+  finally { $('save').disabled = false; }
+};
+
+// ── List ──
+async function refresh(){
+  if (LOCAL_PREVIEW) people = memStore.map(x => ({ ...x }));
+  else { const s = await getDocs(collection(db, 'mkt_access')); people = s.docs.map(d => ({ ...d.data(), email: d.id })); }
+  const admins = people.filter(p => p.role === 'admin').length;
+  $('count').textContent = `${people.length} ${people.length === 1 ? 'person' : 'people'} · ${admins} admin${admins === 1 ? '' : 's'}`;
+  $('rows').innerHTML = sorted().map(p => `<tr>
+    <td class="name">${esc(p.email)}${p.email === emailKey(me.email) ? ' <span class="note">(you)</span>' : ''}</td>
+    <td>${esc(ROLES[p.role]?.l || 'Custom')}</td>
+    <td><div class="tags">${p.role === 'admin' ? '<span class="tag adm">Every page + Users</span>' : (p.pages || []).map(k => `<span class="tag">${esc(PAGES.find(x => x.k === k)?.l || k)}</span>`).join('')}</div></td>
+    <td class="note">${esc(when(p.updatedAt))}${p.updatedBy ? ' · ' + esc(p.updatedBy) : ''}</td>
+    <td><div class="acts"><button class="btn ghost" type="button" data-edit="${esc(p.email)}">Edit</button>${p.email === emailKey(me.email) ? '' : `<button class="btn ghost" type="button" data-del="${esc(p.email)}">Remove</button>`}</div></td></tr>`).join('')
+    || '<tr><td colspan="5" class="empty">Nobody yet.</td></tr>';
+}
+$('rows').onclick = async e => {
+  const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]');
+  if (ed) edit(ed.dataset.edit);
+  if (del) {
+    const email = del.dataset.del;
+    if (!confirm(`Remove ${email}? They will lose access to every page right away.`)) return;
+    try {
+      if (LOCAL_PREVIEW) memStore.splice(memStore.findIndex(x => x.email === email), 1);
+      else await deleteDoc(doc(db, 'mkt_access', email));
+      toast('Removed ' + email); if (editing === email) resetForm(); await refresh();
+    } catch (err) { toast('Could not remove: ' + err.message); }
+  }
+};
+
+// ── Start ──
+const out = async () => { if (LOCAL_PREVIEW) { location.search = ''; return; } await signOut(auth); location.href = 'index.html'; };
+$('signout').onclick = out;
+async function start(user){
+  me = user; $('user-display').textContent = user.displayName || user.email;
+  if (!await guard(db, user, out, 'users')) return;
+  resetForm();
+  try { await refresh(); $('gate').hidden = true; $('app').hidden = false; }
+  catch (err) { console.error(err); $('gate').innerHTML = `<h1>Users could not load</h1><p>${esc(err.message)}</p>`; }
+}
+if (LOCAL_PREVIEW) {
+  memStore.push({ email: 'preview@011global.com', role: 'admin', pages: [], updatedBy: 'preview', updatedAt: new Date() });
+  start({ displayName: 'Local preview', email: 'preview@011global.com' });
+} else onAuthStateChanged(auth, user => {
+  if (!user || !allowedEmail(user.email)) { $('gate').innerHTML = '<h1>Sign in to continue</h1><p>Sign in on the marketing dashboard, then come back here.</p><a class="btn primary" href="index.html">Go to sign in</a>'; return; }
+  start(user);
+});
+</script>
+</body>
+</html>
